@@ -238,6 +238,26 @@ a { color: var(--accent); }
 .start-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
 .start-books { margin-top: 26px; padding-top: 20px; border-top: 1px dashed var(--line); }
 .start-books .f-label { margin-bottom: 10px; display: block; }
+
+/* 学习档案 */
+.archive-card { margin-top: 16px; }
+.archive-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.archive-title { font-size: 16px; margin: 0 0 4px; color: var(--ink); }
+.archive-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: 100%; }
+.archive-tools .input { width: 190px; min-width: 0; flex: 1 1 140px; padding: 7px 11px; font-size: 13px; }
+.archive-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.archive-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--paper); border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px; }
+.archive-main { flex: 1 1 220px; min-width: 0; }
+.archive-name { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 600; font-size: 14px; color: var(--ink); }
+.archive-meta { font-size: 12.5px; color: var(--ink-3); margin-top: 3px; }
+.archive-tag { font-size: 11.5px; font-weight: 500; color: var(--ink-2); background: #f0ece3; border-radius: 6px; padding: 1px 7px; }
+.archive-tag-green { color: var(--green); background: var(--green-soft); }
+.archive-side { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.archive-empty { font-size: 13px; color: var(--ink-3); padding: 10px 2px; }
+@media (max-width: 520px) {
+  .archive-tools { width: 100%; }
+  .archive-tools .input { flex: 1 1 100%; width: auto; }
+}
 .flow-strip {
   margin-top: 24px;
   display: grid;
@@ -751,6 +771,21 @@ td b { color: var(--accent); font-weight: 600; }
           <div class="flow-cell"><b>⑥ 间隔检索</b>0/1/3/7/14/30 天闭卷</div>
         </div>
       </div>
+
+      <!-- 学习档案：用过哪些书、上次什么配置 -->
+      <div class="card archive-card">
+        <div class="archive-head">
+          <div>
+            <h3 class="archive-title">学习档案</h3>
+            <p class="hint" id="archiveStat">还没有档案，生成一次计划就会自动记下来</p>
+          </div>
+          <div class="archive-tools">
+            <input class="input" id="archiveSearch" type="text" autocomplete="off" placeholder="搜书名，比如 认知天性">
+            <button class="btn btn-ghost btn-sm" id="btnArchiveClear" type="button">清空记录</button>
+          </div>
+        </div>
+        <div class="archive-list" id="archiveList"></div>
+      </div>
     </div>
 
     <!-- 计划页 -->
@@ -1104,6 +1139,9 @@ const KEY_PROGRESS = 'xh_progress_v1';
 const KEY_NOTES = 'xh_notes_v1';
 const KEY_PICK = 'xh_pick_v1';
 const KEY_POMO = 'xh_pomo_v1';
+const KEY_LAST = 'xh_last_v1';       // 上次打开时正在用的那套方案
+const KEY_HISTORY = 'xh_history_v1'; // 学习档案：用过哪些书、最后一次什么配置
+const HISTORY_MAX = 20;              // 最多记 20 本书，够用又不至于翻不完
 
 let toastTimer = 0;
 function toast(msg) {
@@ -1333,6 +1371,7 @@ function generatePlan(fromModal) {
   state.plan = plan;
 
   store.set(KEY_PICK, { key: state.bookKey, selected: chapters.map(function (s) { return s.n; }), dailyMin: dailyMin });
+  recordUse(plan, chapters);
 
   showErr('startErr', '');
   if (fromModal) closeChapterPicker();
@@ -2696,6 +2735,209 @@ function bindEvents() {
   });
 }
 
+/* ============================================================
+   M. 学习档案：上次打开的记忆 + 用过哪些书（可检索）
+   ============================================================ */
+function relTime(ts) {
+  const now = Date.now();
+  const diff = Math.max(0, now - (ts || 0));
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return '刚刚';
+  if (min < 60) return min + ' 分钟前';
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return hour + ' 小时前';
+  const day = Math.floor(hour / 24);
+  if (day === 1) return '昨天';
+  if (day < 30) return day + ' 天前';
+  const d = new Date(ts);
+  return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+}
+
+function readArchive() {
+  const raw = store.get(KEY_HISTORY, []);
+  return Array.isArray(raw) ? raw : [];
+}
+
+/** 同一本书只占一行，存最后一次用的配置（书多了也不会乱） */
+function recordUse(plan, chapters) {
+  const rec = {
+    key: plan.subject,
+    dailyMin: plan.dailyMin,
+    sections: chapters.map(function (s) { return s.n; }),
+    planned: plan.plannedSections,
+    avg: plan.avgMinutes,
+    at: Date.now()
+  };
+  store.set(KEY_LAST, rec);
+
+  const list = readArchive().filter(function (x) { return x && x.key !== rec.key; });
+  list.unshift(rec);
+  // 只留内置书目里还认得的书，避免删了书之后留下死记录
+  store.set(KEY_HISTORY, list.slice(0, HISTORY_MAX));
+  renderArchive();
+}
+
+function archiveTag(text, green) {
+  return '<span class="archive-tag' + (green ? ' archive-tag-green' : '') + '">' + esc(text) + '</span>';
+}
+
+function renderArchive() {
+  const listEl = $('archiveList');
+  const statEl = $('archiveStat');
+  if (!listEl) return;
+
+  const all = readArchive();
+  const q = norm(($('archiveSearch') && $('archiveSearch').value) || '');
+  const prev = (store.get(KEY_PROGRESS, {}) || {});
+  const shown = all.filter(function (x) {
+    if (!q) return true;
+    const hay = norm(x.key) + ' ' + (ALIASES[x.key] || []).map(norm).join(' ');
+    return hay.indexOf(q) !== -1;
+  });
+
+  archiveShown = shown;
+
+  if (statEl) {
+    if (!all.length) {
+      statEl.textContent = '还没有档案，生成一次计划就会自动记下来';
+    } else {
+      const books = all.length;
+      const last = all.reduce(function (a, b) { return (b.at || 0) > (a.at || 0) ? b : a; }, all[0]);
+      statEl.textContent = '规划过 ' + books + ' 本书 · 最近一次 ' + relTime(last.at) + '（《' + last.key + '》）';
+    }
+  }
+
+  if (!shown.length) {
+    listEl.innerHTML = '<div class="archive-empty">' +
+      (all.length ? '没有匹配“' + esc(($('archiveSearch') || {}).value || '') + '”的书' : '点上面的「🔍 查章节」，生成第一次计划') +
+      '</div>';
+    return;
+  }
+
+  listEl.innerHTML = shown.map(function (x, i) {
+    const data = CHAPTERS[x.key];
+    const total = data ? data.list.length : 0;
+    const doneN = Array.isArray(prev[x.key]) ? prev[x.key].length : 0;
+    return '<div class="archive-item">' +
+      '<div class="archive-main">' +
+        '<div class="archive-name">《' + esc(x.key) + '》' + archiveTag(x.dailyMin + ' 分钟') +
+          archiveTag((x.sections || []).length + ' 章' + (total ? ' / 共 ' + total : '')) +
+          (doneN ? archiveTag('已打卡 ' + doneN + ' 天', true) : '') + '</div>' +
+        '<div class="archive-meta">排了 ' + (x.planned || (x.sections || []).length) + ' 节 · 日均 ' +
+          (x.avg || '—') + ' 分钟 · ' + relTime(x.at) + '</div>' +
+      '</div>' +
+      '<div class="archive-side">' +
+        '<button class="btn btn-ghost btn-sm" type="button" data-archive-go="' + i + '">继续</button>' +
+        '<button class="btn btn-ghost btn-sm" type="button" data-archive-del="' + i + '" title="从档案里删掉">删</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+let archiveShown = [];
+
+function resumeFromArchive(rec) {
+  if (!rec) return;
+  const data = CHAPTERS[rec.key];
+  if (!data) { toast('这本书已经不在内置书目里了'); return; }
+
+  state.bookKey = rec.key;
+  state.bookData = data;
+  const valid = (rec.sections || []).filter(function (n) {
+    return data.list.some(function (s) { return s.n === n; });
+  });
+  state.selected = new Set(valid.length ? valid : (data.suggest || []));
+  $('inputSubject').value = rec.key;
+
+  const daily = Number(rec.dailyMin) || 60;
+  const has = Array.prototype.slice.call($('selDailyMin').options).some(function (o) {
+    return Number(o.value) === daily;
+  });
+  $('selDailyMin').value = String(has ? daily : 60);
+  state.dailyMin = has ? daily : 60;
+
+  generatePlan(false);
+  toast('已按档案恢复：《' + rec.key + '》· ' + state.dailyMin + ' 分钟');
+}
+
+function deleteArchiveEntry(rec) {
+  if (!rec) return;
+  const list = readArchive().filter(function (x) { return !(x && x.key === rec.key); });
+  store.set(KEY_HISTORY, list);
+  const last = store.get(KEY_LAST, null);
+  if (last && last.key === rec.key) store.del(KEY_LAST);
+  renderArchive();
+  toast('已从档案删除：《' + rec.key + '》');
+}
+
+function bindArchive() {
+  const listEl = $('archiveList');
+  const searchEl = $('archiveSearch');
+  if (searchEl) {
+    searchEl.addEventListener('input', function () { renderArchive(); });
+  }
+  if (listEl) {
+    listEl.addEventListener('click', function (e) {
+      const goBtn = e.target.closest('[data-archive-go]');
+      if (goBtn) {
+        resumeFromArchive(archiveShown[Number(goBtn.dataset.archiveGo)]);
+        return;
+      }
+      const delBtn = e.target.closest('[data-archive-del]');
+      if (delBtn) {
+        const rec = archiveShown[Number(delBtn.dataset.archiveDel)];
+        if (rec && window.confirm('从档案里删掉《' + rec.key + '》？（打卡和知识点不受影响）')) {
+          deleteArchiveEntry(rec);
+        }
+      }
+    });
+  }
+  const clearBtn = $('btnArchiveClear');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function () {
+      const n = readArchive().length;
+      if (!n) { toast('档案本来就是空的'); return; }
+      if (!window.confirm('清空 ' + n + ' 本书的档案记录？打卡和知识点不会动。')) return;
+      store.del(KEY_HISTORY);
+      store.del(KEY_LAST);
+      renderArchive();
+      toast('档案已清空');
+    });
+  }
+}
+
+/** 打开页面时回到上次那套计划：书 / 投入 / 勾选的章节一律按记录复原 */
+function restoreLastPlan() {
+  const last = store.get(KEY_LAST, null);
+  if (!last || !last.key || !CHAPTERS[last.key]) return false;
+  const data = CHAPTERS[last.key];
+
+  state.bookKey = last.key;
+  state.bookData = data;
+  const valid = (last.sections || []).filter(function (n) {
+    return data.list.some(function (s) { return s.n === n; });
+  });
+  state.selected = new Set(valid.length ? valid : (data.suggest || []));
+
+  const daily = Number(last.dailyMin) || 60;
+  const has = Array.prototype.slice.call($('selDailyMin').options).some(function (o) {
+    return Number(o.value) === daily;
+  });
+  state.dailyMin = has ? daily : 60;
+  $('selDailyMin').value = String(state.dailyMin);
+  $('inputSubject').value = last.key;
+
+  let chapters = pickedChapters();
+  if (!chapters.length) {
+    chapters = data.list.filter(function (s) { return (data.suggest || []).indexOf(s.n) !== -1; });
+  }
+  state.plan = buildPlan(last.key, chapters.length, state.dailyMin, chapters);
+  renderPlan();
+  showPlanView();
+  switchTab('plan');
+  return true;
+}
+
 function restorePick() {
   const pick = store.get(KEY_PICK, null);
   if (!pick || !pick.key || !CHAPTERS[pick.key]) return;
@@ -2722,11 +2964,19 @@ function init() {
   renderNotes();
   restorePick();
   bindEvents();
+  bindArchive();
+  renderArchive();
+
+  // 上次打开时正在看哪本书，就直接回到那张计划表；想换书就点“换一本书”
+  const restored = restoreLastPlan();
+  if (restored) {
+    toast('已回到上次的计划，换别的书点“换一本书”');
+  }
 
   selfCheckIds();
   selfCheckChapters();
   selfCheckPlan();
-  console.log('[学习闭环] 启动完成：4 个页签、章节弹框、计划引擎、番茄钟、知识点全部就绪。');
+  console.log('[学习闭环] 启动完成：4 个页签、章节弹框、计划引擎、番茄钟、知识点、学习档案全部就绪。');
 }
 
 if (document.readyState === 'loading') {
