@@ -321,6 +321,8 @@ a { color: var(--accent); }
 .import-row { display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 12px; }
 .import-row .field { min-width: 0; }
 @media (max-width: 520px) { .import-row { grid-template-columns: minmax(0, 1fr); } }
+.import-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.import-label-row .btn { flex: 0 0 auto; }
 .modal-import .textarea { min-height: 130px; }
 .modal-head {
   flex: 0 0 auto;
@@ -1007,7 +1009,10 @@ td b { color: var(--accent); font-weight: 600; }
         </div>
       </div>
       <div class="field">
-        <label class="f-label" for="importText">把目录整段粘进来（一行一章即可）</label>
+        <div class="import-label-row">
+          <label class="f-label" for="importText">把目录整段粘进来（一行一章即可）</label>
+          <button class="btn btn-ghost btn-sm" id="btnPasteClip" type="button">📋 读剪贴板</button>
+        </div>
         <textarea class="textarea" id="importText" placeholder="第一章 天心&#10;第二章 回光&#10;第三章 回光论证&#10;……"></textarea>
       </div>
       <div class="hint" id="importPreview">还没粘内容：可以直接点下面「按章数生成」。</div>
@@ -1302,7 +1307,7 @@ function openChapterPicker() {
   const hit = searchSections(raw);
   if (!hit) {
     const top = fuzzyRank(norm(raw)).slice(0, 3).map(function (x) { return x.key; });
-    showErr('startErr', '内置书目里没有“' + raw + '”。' + (top.length ? '你是不是要找：' + top.join(' / ') + '？没有的话点下面「📥 任意书」把目录粘进来。' : '点下面「📥 任意书」把目录粘进来就能用。'));
+    showErr('startErr', '内置书目里没有“' + raw + '”。' + (top.length ? '你是不是要找：' + top.join(' / ') + '？' : '') + '点下面两个搜索入口找到它，复制目录回来 →「📥 任意书」→「📋 读剪贴板」就能用；实在找不到目录就按章数生成。');
     showSearchLinks(raw);
     return;
   }
@@ -3021,31 +3026,52 @@ function restoreLastPlan() {
    和内置书完全同权：能查、能勾、能排 31 天、能进学习档案。
    ============================================================ */
 const CN_NUM = '[0-9０-９一二三四五六七八九十百千零〇两]+';
+const CH_UNIT = '章节講讲回部篇課课卷课';
 const OUTLINE_HEAD = new RegExp(
-  '^(?:第\\s*' + CN_NUM + '\\s*[章节講讲回部篇課课卷]' +
-  '|chapter\\s*\\d+|part\\s*\\d+' +
-  '|序言|自序|序一|序二|前言|导言|引言|绪论|结语|后记|附录[\\w\\u4e00-\\u9fa5]*|参考文献|致谢|索引)',
+  '^((?:第|卷)\\s*' + CN_NUM + '\\s*[' + CH_UNIT + ']' +
+  '|(?:chapter|part|lecture|unit|section|module|lesson)\\s*[0-9ivxlcdm]+' +
+  '|§\\s*\\d+' +
+  '|序言|自序|代序|序一|序二|前言|导言|引言|绪论|导论|总论|结语|结论|尾声|后记|编后记|译后记|跋|导读|上篇|下篇|上卷|下卷' +
+  '|附录[\\w\\u4e00-\\u9fa5]*|参考文献|致谢|索引)',
   'i'
 );
-const OUTLINE_NOISE = /^(?:目\s*录|目錄|contents?|总目录|分目录|返回目录|封面|扉页|版权页|copyright)$/i;
+// “第X章 / Chapter 1”这种光秃秃只有编号的行，需要和下一行合并
+const OUTLINE_BARE = new RegExp(
+  '^(?:第\\s*' + CN_NUM + '\\s*[' + CH_UNIT + ']|(?:chapter|part|lecture|unit|section)\\s*[0-9ivxlcdm]+|§\\s*\\d+)$',
+  'i'
+);
+// 目录页里的出版信息 / 页码 / 网址，一律当噪声丢掉
+const OUTLINE_NOISE = /^(?:(?:目\s*)?录|目錄|contents?|总目录|分目录|返回目录|封面|扉页|版权页|copyright|作者|译者|绘者|编者|主编|编著|著者|责任编辑|责任校对|出版社|出版发行|出版时间|出版日期|印刷|监制|出品|发行|isbn|定价|开本|印张|字数|页数|版次|印次|插页|装帧|封面设计|内文设计|版式设计|图书在版编目|cip|中图法分类号|分类号|上架建议|选题策划|媒体运营|电子信箱|网址|微信读书|加入书架|开始阅读|立即阅读|试读|购买|查看更多|推荐语|媒体评论|内容简介|作者简介|目录导航)/i;
+// 无“第X章”时的备用形态：1 绪论 / 1. 绪论 / 一、绪论
+const OUTLINE_NUM = /^(\d{1,3})[\s.．、)）]+[\u4e00-\u9fa5A-Za-z]/;
+const OUTLINE_NUM_CN = /^[一二三四五六七八九十]{1,3}[、.．]\s*[\u4e00-\u9fa5A-Za-z]/;
 
 /** 把一段目录文字解析成 [{n,title,desc}] */
 function parseOutline(text) {
   const lines = String(text || '')
     .replace(/\r/g, '')
     .split('\n')
-    .map(function (s) { return s.replace(/[\u00a0\t\u3000]+/g, ' ').trim(); })
+    .map(function (s) {
+      // 去掉微信读书/PDF 复制常见的点线、连续空格、页码尾巴
+      return s
+        .replace(/\u00a0/g, ' ')
+        .replace(/\s*(?:…+|[.．·‥]{2,}|\.{3,})\s*\d{0,4}\s*$/g, '')
+        .replace(/\s*(?:\|\s*)?(?:第\s*\d+\s*页|p\.?\s*\d{1,4})$/i, '')
+        .replace(/[\t\u3000]+/g, ' ')
+        .trim();
+    })
     .filter(function (s) {
       if (!s || s.length > 56) return false;
       if (OUTLINE_NOISE.test(s)) return false;
-      if (/^[-—=·*_](\s*[-—=·*_]){2,}$/.test(s)) return false;
-      if (/^[-—(（\[]?\s*\d{1,4}\s*[)）\]页]?\s*[-—]?$/.test(s)) return false; // 纯页码
+      if (/^[-—=·*_～~—](?:\s*[-—=·*_～~—]){2,}$/.test(s)) return false;
+      if (/^(?:[-—(（\[]?\s*\d{1,4}\s*[)）\]页]?\s*[-—]?|共\s*\d+\s*页|本书共.*页)$/.test(s)) return false; // 纯页码
       if (/^(https?:\/\/|www\.)/i.test(s)) return false;
       return true;
     });
 
   const heads = lines.filter(function (s) { return OUTLINE_HEAD.test(s); });
   let picked = [];
+  let numbering = '';
 
   if (heads.length >= 2) {
     // 有明确的“第X章”结构：按标题行切，短标题行（如“第一章”单独一行）并入下一行
@@ -3057,21 +3083,34 @@ function parseOutline(text) {
       }
       if (!picked.length) continue;
       const last = picked[picked.length - 1];
-      const lastIsBare = new RegExp('^(?:第\\s*' + CN_NUM + '\\s*[章节講讲回部篇課课卷]|chapter\\s*\\d+|part\\s*\\d+)$', 'i').test(last);
-      if ((lastIsBare || last.length <= 6) && line.length <= 26) {
+      if ((OUTLINE_BARE.test(last) || last.length <= 6) && line.length <= 26) {
         picked[picked.length - 1] = last + '　' + line;
       }
     }
   } else {
-    // 没写出“第X章”：退化为“一行一章”
-    picked = lines.filter(function (s) { return s.length >= 2 && s.length <= 40; });
+    const nums = lines.filter(function (s) { return OUTLINE_NUM.test(s); });
+    const numsCn = lines.filter(function (s) { return OUTLINE_NUM_CN.test(s); });
+    if (nums.length >= 3) {
+      picked = nums;
+      numbering = 'arabic';
+    } else if (numsCn.length >= 3) {
+      picked = numsCn;
+      numbering = 'cn';
+    } else {
+      // 实在看不出结构：退化为“一行一章”
+      picked = lines.filter(function (s) { return s.length >= 2 && s.length <= 40; });
+    }
   }
 
   const seen = {};
   return picked.map(function (t) {
-    let title = t.replace(/[.·…\s]{2,}(?:\d{1,4})?$/, '').replace(/^[-—·\s]+/, '').trim();
-    // 去掉“第一章 / Chapter 1”这种编号前缀，只留章节名（编号由 n 管）
-    const stripped = title.replace(new RegExp('^(?:第\\s*' + CN_NUM + '\\s*[章节講讲回部篇課课卷]|chapter\\s*\\d+|part\\s*\\d+)\\s*', 'i'), '').trim();
+    let title = t.replace(/^[-—·\s]+/, '').trim();
+    // 去掉“第一章 / Chapter 1 / 1. / 一、”这类编号前缀，只留章节名（编号由 n 管）
+    let stripped = title
+      .replace(new RegExp('^(?:第\\s*' + CN_NUM + '\\s*[' + CH_UNIT + ']|(?:chapter|part|lecture|unit|section|module|lesson)\\s*[0-9ivxlcdm]+|§\\s*\\d+)\\s*', 'i'), '')
+      .replace(/^[一二三四五六七八九十]{1,3}[、.．]\s*/, '')
+      .trim();
+    if (numbering === 'arabic') stripped = stripped.replace(/^\d{1,3}\s*[.．、)）]?\s*/, '');
     title = stripped || title;
     return title.slice(0, 46);
   }).filter(function (t) {
@@ -3210,10 +3249,61 @@ function showSearchLinks(name) {
   const box = $('searchLinks');
   if (!box) return;
   if (!name) { box.hidden = true; return; }
+  state.searchName = name;
   const q = encodeURIComponent(name);
   if ($('linkWeread')) $('linkWeread').href = 'https://weread.qq.com/web/search?keyword=' + q;
   if ($('linkDouban')) $('linkDouban').href = 'https://search.douban.com/book/subject_search?search_text=' + q;
   box.hidden = false;
+}
+
+/* ------------------------------------------------------------
+   去搜索页逛一圈再回来：记一下“等会儿要粘哪本书的目录”。
+   回来时自动把导入弹框打开、书名填好，人只需要 Ctrl+V。
+   ------------------------------------------------------------ */
+const KEY_WAIT = 'xh_wait_outline_v1';
+
+function markWaitOutline(name) {
+  const n = (name || ($('inputSubject') && $('inputSubject').value) || '').trim();
+  if (!n) return;
+  try { sessionStorage.setItem(KEY_WAIT, n); } catch (e) {}
+}
+
+function resumeFromSearch() {
+  let name = '';
+  try { name = sessionStorage.getItem(KEY_WAIT) || ''; } catch (e) {}
+  if (!name) return;
+  try { sessionStorage.removeItem(KEY_WAIT); } catch (e) {}
+  if ($('importModal') && !$('importModal').hidden) return;   // 已经开着，别重复弹
+  if ($('planView') && !$('planView').hidden) return;         // 人在计划页，别打断
+  $('inputSubject').value = name;
+  openImportModal();
+  $('importText').focus();
+  toast('回来了？点「📋 读剪贴板」或直接 Ctrl+V，把刚复制的目录贴进来');
+}
+
+/** 从剪贴板读目录：浏览器允许就直接填进文本框 */
+function readClipboardInto() {
+  const ta = $('importText');
+  if (!ta) return;
+  const fill = function (txt) {
+    if (!txt || !String(txt).trim()) {
+      toast('剪贴板里没文字，先去那一页全选复制目录');
+      return;
+    }
+    ta.value = String(txt);
+    previewImport();
+    const n = parseOutline(ta.value).length;
+    toast(n ? '读到 ' + n + ' 章，明细不对就手动删两行再解析' : '读到了内容，但没认出章节：换一段粘，或按章数生成');
+  };
+  if (navigator.clipboard && navigator.clipboard.readText) {
+    navigator.clipboard.readText().then(fill).catch(function () {
+      toast('浏览器没给剪贴板权限：点一下下面的框，Ctrl+V 效果一样');
+      ta.focus();
+    });
+    return;
+  }
+  toast('这个浏览器不让直接读剪贴板：点一下下面的框，按 Ctrl+V 粘贴');
+  ta.focus();
 }
 
 function bindImport() {
@@ -3229,6 +3319,24 @@ function bindImport() {
       if (e.target === mask) closeImportModal();
     });
   }
+
+  if ($('btnPasteClip')) $('btnPasteClip').addEventListener('click', readClipboardInto);
+
+  // 点“去微信读书/豆瓣搜”时把书名记下、导入弹框先备好；回来直接粘贴
+  ['linkWeread', 'linkDouban'].forEach(function (id) {
+    const a = $(id);
+    if (!a) return;
+    a.addEventListener('click', function () {
+      markWaitOutline(state.searchName);
+      openImportModal();
+      if ($('importText')) $('importText').focus();
+      toast('目录复制好后点「📋 读剪贴板」，或直接 Ctrl+V');
+    });
+  });
+  window.addEventListener('focus', function () { window.setTimeout(resumeFromSearch, 120); });
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) window.setTimeout(resumeFromSearch, 120);
+  });
 
   const textarea = $('importText');
   if (textarea) {
