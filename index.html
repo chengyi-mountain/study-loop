@@ -258,6 +258,14 @@ a { color: var(--accent); }
   .archive-tools { width: 100%; }
   .archive-tools .input { flex: 1 1 100%; width: auto; }
 }
+
+/* 任意书导入入口 + 查不到时的外链兜底 */
+.import-entry { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.import-entry .hint { max-width: 100%; }
+.search-links { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; padding: 11px 13px; background: var(--paper); border: 1px solid var(--line); border-radius: 11px; }
+.search-links .hint { flex: 1 1 100%; }
+.chip-sep { font-size: 12.5px; color: var(--ink-3); align-self: center; margin: 0 2px; }
+.chip-custom::after { content: "📥"; margin-left: 4px; font-size: 11px; opacity: .7; }
 .flow-strip {
   margin-top: 24px;
   display: grid;
@@ -305,6 +313,15 @@ a { color: var(--accent); }
 @keyframes modalIn { from { opacity: 0; transform: translateY(8px) scale(.99); } to { opacity: 1; transform: none; } }
 @media (max-width: 640px) { .modal { height: 84vh; border-radius: 14px; } .modal-mask { padding: 10px; } }
 .modal:focus { outline: none; }
+
+/* 导入任意书：高度跟着内容走，别留一大片空白 */
+.modal-import { height: auto; max-height: min(78vh, 660px); }
+.modal-import .modal-body { flex: 0 1 auto; }
+.import-body { display: flex; flex-direction: column; gap: 12px; }
+.import-row { display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 12px; }
+.import-row .field { min-width: 0; }
+@media (max-width: 520px) { .import-row { grid-template-columns: minmax(0, 1fr); } }
+.modal-import .textarea { min-height: 130px; }
 .modal-head {
   flex: 0 0 auto;
   padding: 16px 22px 12px;
@@ -757,9 +774,19 @@ td b { color: var(--accent); font-weight: 600; }
           <span class="err" id="startErr" hidden></span>
         </div>
 
+        <div class="search-links" id="searchLinks" hidden>
+          <span class="hint">没有内置目录的书，去这里复制一份章节目录，再粘回来：</span>
+          <a class="btn btn-ghost btn-sm" id="linkWeread" href="#" target="_blank" rel="noopener">微信读书搜这本书</a>
+          <a class="btn btn-ghost btn-sm" id="linkDouban" href="#" target="_blank" rel="noopener">豆瓣搜这本书</a>
+        </div>
+
         <div class="start-books">
           <span class="f-label">内置书目（点一下直接查）</span>
           <div class="chips" id="startBooks"></div>
+          <div class="import-entry">
+            <button class="btn btn-ghost btn-sm" id="btnOpenImport" type="button">📥 任意书：粘贴目录 / 按章数</button>
+            <span class="hint">没有内置目录的书，在这里导入一次，之后和内置书一样能查、能排计划、能进学习档案</span>
+          </div>
         </div>
 
         <div class="flow-strip">
@@ -958,6 +985,44 @@ td b { color: var(--accent); font-weight: 600; }
 
 <div class="toast" id="toast"></div>
 
+<!-- ========================= 导入任意书目录 ========================= -->
+<div class="modal-mask" id="importModal" hidden>
+  <div class="modal modal-import" id="importBox" role="dialog" aria-modal="true" aria-labelledby="importTitle" tabindex="-1">
+    <div class="modal-head">
+      <div>
+        <h3 id="importTitle">导入任意一本书的目录</h3>
+        <p id="importSub">内置目录里没有的书：粘一次目录就好，数据只存本机浏览器</p>
+      </div>
+      <button class="modal-close" id="btnCloseImport" type="button" aria-label="关闭">✕</button>
+    </div>
+    <div class="modal-body import-body">
+      <div class="import-row">
+        <div class="field">
+          <label class="f-label" for="importName">书名</label>
+          <input class="input" id="importName" type="text" autocomplete="off" placeholder="例：太乙金华宗旨">
+        </div>
+        <div class="field">
+          <label class="f-label" for="importCount">章数（没目录时用）</label>
+          <input class="input" id="importCount" type="number" min="1" max="80" value="12">
+        </div>
+      </div>
+      <div class="field">
+        <label class="f-label" for="importText">把目录整段粘进来（一行一章即可）</label>
+        <textarea class="textarea" id="importText" placeholder="第一章 天心&#10;第二章 回光&#10;第三章 回光论证&#10;……"></textarea>
+      </div>
+      <div class="hint" id="importPreview">还没粘内容：可以直接点下面「按章数生成」。</div>
+    </div>
+    <div class="modal-foot">
+      <div class="modal-count" id="importStat">识别到 0 章</div>
+      <div class="btn-row">
+        <button class="btn btn-ghost btn-sm" id="btnImportGeneric" type="button">按章数生成</button>
+        <button class="btn btn-primary btn-sm" id="btnImportParse" type="button">解析并导入</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <script>
 /* ============================================================
    A. 章节目录数据
@@ -1141,6 +1206,7 @@ const KEY_PICK = 'xh_pick_v1';
 const KEY_POMO = 'xh_pomo_v1';
 const KEY_LAST = 'xh_last_v1';       // 上次打开时正在用的那套方案
 const KEY_HISTORY = 'xh_history_v1'; // 学习档案：用过哪些书、最后一次什么配置
+const KEY_LIB = 'xh_lib_v1';         // 自己导入的目录（任意书）
 const HISTORY_MAX = 20;              // 最多记 20 本书，够用又不至于翻不完
 
 let toastTimer = 0;
@@ -1236,9 +1302,11 @@ function openChapterPicker() {
   const hit = searchSections(raw);
   if (!hit) {
     const top = fuzzyRank(norm(raw)).slice(0, 3).map(function (x) { return x.key; });
-    showErr('startErr', '内置书目里没有“' + raw + '”。' + (top.length ? '你是不是要找：' + top.join(' / ') : '可以点下方内置书目试一本。'));
+    showErr('startErr', '内置书目里没有“' + raw + '”。' + (top.length ? '你是不是要找：' + top.join(' / ') + '？没有的话点下面「📥 任意书」把目录粘进来。' : '点下面「📥 任意书」把目录粘进来就能用。'));
+    showSearchLinks(raw);
     return;
   }
+  showSearchLinks(null);
 
   // 换书 → 勾选清空，默认全不选，只高亮建议章节
   state.bookKey = hit.key;
@@ -1270,13 +1338,15 @@ function renderChapterList() {
   $('modalList').innerHTML = list.map(function (sec) {
     const isSug = suggest.indexOf(sec.n) !== -1;
     const checked = state.selected.has(sec.n) ? ' checked' : '';
+    // 标题本身带“第X章”时不再重复标编号，避免“第 1 章 第一章 天心”
+    const selfNumbered = /^(第\s*[0-9０-９一二三四五六七八九十百千零〇两]+\s*[章节講讲回部篇課课卷]|chapter\s*\d+)/i.test(String(sec.title || '').trim());
     return '<label class="chk' + (isSug ? ' sug' : '') + '">' +
       '<input type="checkbox" data-n="' + sec.n + '"' + checked + '>' +
       '<span class="chk-body">' +
-        '<span class="chk-n">第 ' + sec.n + ' 章</span>' +
+        (selfNumbered ? '' : '<span class="chk-n">第 ' + sec.n + ' 章</span>') +
         '<span class="chk-t">' + esc(sec.title) + '</span>' +
         (isSug ? ' <span class="pill pill-amber">建议</span>' : '') +
-        '<span class="chk-d">' + esc(sec.desc) + '</span>' +
+        '<span class="chk-d">' + esc(sec.desc || '（这篇目录没带简介）') + '</span>' +
       '</span>' +
     '</label>';
   }).join('');
@@ -1374,6 +1444,7 @@ function generatePlan(fromModal) {
   recordUse(plan, chapters);
 
   showErr('startErr', '');
+  showSearchLinks(null);
   if (fromModal) closeChapterPicker();
   renderPlan();
   showPlanView();
@@ -2529,9 +2600,13 @@ function exportNotes() {
    ============================================================ */
 function renderBookChips() {
   const keys = Object.keys(CHAPTERS);
-  $('startBooks').innerHTML = keys.map(function (k) {
-    return '<button class="chip" type="button" data-book="' + esc(k) + '">' + esc(k) + '</button>';
-  }).join('');
+  const builtin = keys.filter(function (k) { return !CHAPTERS[k].custom; });
+  const custom = keys.filter(function (k) { return CHAPTERS[k].custom; });
+  const chip = function (k) {
+    return '<button class="chip' + (CHAPTERS[k].custom ? ' chip-custom' : '') + '" type="button" data-book="' + esc(k) + '">' + esc(k) + '</button>';
+  };
+  $('startBooks').innerHTML = builtin.map(chip).join('') +
+    (custom.length ? '<span class="chip-sep">你导入的</span>' + custom.map(chip).join('') : '');
   $('startBooks').addEventListener('click', function (e) {
     const chip = e.target.closest('.chip');
     if (!chip) return;
@@ -2938,6 +3013,242 @@ function restoreLastPlan() {
   return true;
 }
 
+/* ============================================================
+   N. 任意书：粘贴目录导入 / 按章数兜底
+   ------------------------------------------------------------
+   内置目录只有 6 本，剩下的书靠用户自己把目录粘进来一次。
+   解析出来的章节照样是 {n,title,desc} 对象，写进 localStorage 后
+   和内置书完全同权：能查、能勾、能排 31 天、能进学习档案。
+   ============================================================ */
+const CN_NUM = '[0-9０-９一二三四五六七八九十百千零〇两]+';
+const OUTLINE_HEAD = new RegExp(
+  '^(?:第\\s*' + CN_NUM + '\\s*[章节講讲回部篇課课卷]' +
+  '|chapter\\s*\\d+|part\\s*\\d+' +
+  '|序言|自序|序一|序二|前言|导言|引言|绪论|结语|后记|附录[\\w\\u4e00-\\u9fa5]*|参考文献|致谢|索引)',
+  'i'
+);
+const OUTLINE_NOISE = /^(?:目\s*录|目錄|contents?|总目录|分目录|返回目录|封面|扉页|版权页|copyright)$/i;
+
+/** 把一段目录文字解析成 [{n,title,desc}] */
+function parseOutline(text) {
+  const lines = String(text || '')
+    .replace(/\r/g, '')
+    .split('\n')
+    .map(function (s) { return s.replace(/[\u00a0\t\u3000]+/g, ' ').trim(); })
+    .filter(function (s) {
+      if (!s || s.length > 56) return false;
+      if (OUTLINE_NOISE.test(s)) return false;
+      if (/^[-—=·*_](\s*[-—=·*_]){2,}$/.test(s)) return false;
+      if (/^[-—(（\[]?\s*\d{1,4}\s*[)）\]页]?\s*[-—]?$/.test(s)) return false; // 纯页码
+      if (/^(https?:\/\/|www\.)/i.test(s)) return false;
+      return true;
+    });
+
+  const heads = lines.filter(function (s) { return OUTLINE_HEAD.test(s); });
+  let picked = [];
+
+  if (heads.length >= 2) {
+    // 有明确的“第X章”结构：按标题行切，短标题行（如“第一章”单独一行）并入下一行
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (OUTLINE_HEAD.test(line)) {
+        picked.push(line);
+        continue;
+      }
+      if (!picked.length) continue;
+      const last = picked[picked.length - 1];
+      const lastIsBare = new RegExp('^(?:第\\s*' + CN_NUM + '\\s*[章节講讲回部篇課课卷]|chapter\\s*\\d+|part\\s*\\d+)$', 'i').test(last);
+      if ((lastIsBare || last.length <= 6) && line.length <= 26) {
+        picked[picked.length - 1] = last + '　' + line;
+      }
+    }
+  } else {
+    // 没写出“第X章”：退化为“一行一章”
+    picked = lines.filter(function (s) { return s.length >= 2 && s.length <= 40; });
+  }
+
+  const seen = {};
+  return picked.map(function (t) {
+    let title = t.replace(/[.·…\s]{2,}(?:\d{1,4})?$/, '').replace(/^[-—·\s]+/, '').trim();
+    // 去掉“第一章 / Chapter 1”这种编号前缀，只留章节名（编号由 n 管）
+    const stripped = title.replace(new RegExp('^(?:第\\s*' + CN_NUM + '\\s*[章节講讲回部篇課课卷]|chapter\\s*\\d+|part\\s*\\d+)\\s*', 'i'), '').trim();
+    title = stripped || title;
+    return title.slice(0, 46);
+  }).filter(function (t) {
+    if (!t || seen[t]) return false;
+    seen[t] = 1;
+    return true;
+  }).map(function (t, i) {
+    return { n: i + 1, title: t, desc: '' };
+  });
+}
+
+/** 只知道章数时，造一批“第 n 章”占位 */
+function genericChapters(count) {
+  const c = Math.max(1, Math.min(80, Number(count) || 12));
+  const list = [];
+  for (let i = 1; i <= c; i++) list.push({ n: i, title: '第 ' + i + ' 章', desc: '' });
+  return list;
+}
+
+function suggestFor(count) {
+  return [1, 2, 3].filter(function (n) { return n <= count; });
+}
+
+/** 导入的自定义书目：存进 localStorage，下次打开自动并回 CHAPTERS */
+function saveCustomLib() {
+  const lib = {};
+  Object.keys(CHAPTERS).forEach(function (k) {
+    const d = CHAPTERS[k];
+    if (d && d.custom) {
+      lib[k] = {
+        info: d.info, suggest: d.suggest, note: d.note,
+        list: d.list.map(function (s) { return { n: s.n, title: s.title, desc: s.desc }; })
+      };
+    }
+  });
+  store.set(KEY_LIB, lib);
+}
+
+function loadCustomLib() {
+  const lib = store.get(KEY_LIB, null);
+  if (!lib || typeof lib !== 'object') return 0;
+  let count = 0;
+  Object.keys(lib).forEach(function (k) {
+    if (CHAPTERS[k]) return;                    // 内置书目永远优先，不被脏数据顶掉
+    const d = lib[k];
+    if (!d || !Array.isArray(d.list)) return;
+    // 铁律校验：只收 {n,title,desc} 对象，三元组一律丢掉
+    const list = d.list.filter(function (s) {
+      return s && typeof s === 'object' && !Array.isArray(s) &&
+             typeof s.n === 'number' && typeof s.title === 'string' && s.title;
+    }).map(function (s) {
+      return { n: s.n, title: s.title, desc: typeof s.desc === 'string' ? s.desc : '' };
+    });
+    if (!list.length) return;
+    CHAPTERS[k] = {
+      info: d.info || ('《' + k + '》· 你自己导入的目录（' + list.length + ' 章）'),
+      suggest: Array.isArray(d.suggest) ? d.suggest : suggestFor(list.length),
+      note: d.note || '这是导入的目录：建议先学前 3 章建立框架，后面的按计划推进。',
+      list: list,
+      custom: true
+    };
+    count++;
+  });
+  return count;
+}
+
+function openImportModal() {
+  const sub = $('importSub');
+  if (sub) sub.textContent = '内置目录里没有的书：粘一次目录就好，数据只存本机浏览器';
+  $('importName').value = ($('inputSubject').value || '').trim();
+  $('importModal').hidden = false;
+  previewImport();
+  $('importName').focus();
+}
+
+function closeImportModal() {
+  $('importModal').hidden = true;
+}
+
+function previewImport() {
+  const list = parseOutline($('importText').value);
+  const stat = $('importStat');
+  const prev = $('importPreview');
+  if (stat) stat.textContent = list.length ? '识别到 ' + list.length + ' 章' : '识别到 0 章';
+  if (!prev) return;
+  if (!list.length) {
+    prev.textContent = '还没识别到章节：可以直接点下面「按章数生成」，或者把目录一行一章再粘一次。';
+    return;
+  }
+  const head = list.slice(0, 4).map(function (x) { return x.title; }).join(' / ');
+  prev.textContent = '示例：' + head + (list.length > 4 ? ' …（共 ' + list.length + ' 章）' : '');
+}
+
+function doImport(kind) {
+  const name = ($('importName').value || '').trim();
+  if (!name) { toast('先填书名'); $('importName').focus(); return; }
+  if (name.length > 24) { toast('书名太长了，24 字以内'); return; }
+
+  let list;
+  if (kind === 'parse') {
+    list = parseOutline($('importText').value);
+    if (!list.length) { toast('没识别到章节，改用「按章数生成」吧'); return; }
+  } else {
+    list = genericChapters(Number($('importCount').value));
+  }
+
+  if (CHAPTERS[name] && CHAPTERS[name].custom) {
+    if (!window.confirm('《' + name + '》之前导入过，用这次的目录覆盖它？')) return;
+  } else if (CHAPTERS[name]) {
+    toast('《' + name + '》是内置书目，换个名字再导入（比如加个副标题）');
+    return;
+  }
+
+  CHAPTERS[name] = {
+    info: '《' + name + '》· 你自己导入的目录（' + list.length + ' 章）' + (kind === 'parse' ? '，从粘贴的目录解析而来' : '，按章数生成的占位标题') + '。',
+    suggest: suggestFor(list.length),
+    note: '这是导入的目录：建议先学前 3 章建立框架，后面的按计划推进。',
+    list: list,
+    custom: true
+  };
+  saveCustomLib();
+  renderBookChips();
+  closeImportModal();
+
+  // 导入完立刻进章节弹框，让人挑章节
+  state.bookKey = name;
+  state.bookData = CHAPTERS[name];
+  state.selected = new Set();
+  $('inputSubject').value = name;
+  openChapterPicker();
+  toast('已导入《' + name + '》，共 ' + list.length + ' 章');
+}
+
+/** 查不到内置目录时，给两条“自己去搜”的外链（只跳转，不抓内容） */
+function showSearchLinks(name) {
+  const box = $('searchLinks');
+  if (!box) return;
+  if (!name) { box.hidden = true; return; }
+  const q = encodeURIComponent(name);
+  if ($('linkWeread')) $('linkWeread').href = 'https://weread.qq.com/web/search?keyword=' + q;
+  if ($('linkDouban')) $('linkDouban').href = 'https://search.douban.com/book/subject_search?search_text=' + q;
+  box.hidden = false;
+}
+
+function bindImport() {
+  const openBtn = $('btnOpenImport');
+  if (openBtn) openBtn.addEventListener('click', openImportModal);
+
+  const closeBtn = $('btnCloseImport');
+  if (closeBtn) closeBtn.addEventListener('click', closeImportModal);
+
+  const mask = $('importModal');
+  if (mask) {
+    mask.addEventListener('click', function (e) {
+      if (e.target === mask) closeImportModal();
+    });
+  }
+
+  const textarea = $('importText');
+  if (textarea) {
+    textarea.addEventListener('input', previewImport);
+    textarea.addEventListener('paste', function () { window.setTimeout(previewImport, 0); });
+  }
+
+  if ($('btnImportParse')) $('btnImportParse').addEventListener('click', function () { doImport('parse'); });
+  if ($('btnImportGeneric')) $('btnImportGeneric').addEventListener('click', function () { doImport('generic'); });
+  if ($('importName')) {
+    $('importName').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); $('importText').focus(); }
+    });
+  }
+
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && $('importModal') && !$('importModal').hidden) closeImportModal();
+  });
+}
+
 function restorePick() {
   const pick = store.get(KEY_PICK, null);
   if (!pick || !pick.key || !CHAPTERS[pick.key]) return;
@@ -2956,6 +3267,7 @@ function restorePick() {
 }
 
 function init() {
+  const imported = loadCustomLib();   // 先把自己导入的书并回 CHAPTERS，后面一切照旧
   renderBookChips();
   renderMethod();
   pomoLoad();
@@ -2965,6 +3277,7 @@ function init() {
   restorePick();
   bindEvents();
   bindArchive();
+  bindImport();
   renderArchive();
 
   // 上次打开时正在看哪本书，就直接回到那张计划表；想换书就点“换一本书”
