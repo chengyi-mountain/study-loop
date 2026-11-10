@@ -1,0 +1,2624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>学习闭环 · 30天计划生成器</title>
+<style>
+/* ============================================================
+   0. 基础变量
+   ============================================================ */
+* { box-sizing: border-box; }
+:root {
+  --bg: #f5f1e8;
+  --paper: #fffdf9;
+  --line: #e3dbcb;
+  --line-2: #f1ebe0;
+  --ink: #28251f;
+  --ink-2: #6d665a;
+  --ink-3: #9a9184;
+  --accent: #a9552c;
+  --accent-soft: #f4e4d8;
+  --green: #2f6f5e;
+  --green-soft: #e4efe9;
+  --amber: #b8802a;
+  --amber-soft: #fbefd6;
+  --red: #a63535;
+  --red-soft: #f8e6e3;
+  --shadow: 0 10px 30px rgba(52, 40, 25, .09);
+  --shadow-sm: 0 2px 10px rgba(52, 40, 25, .06);
+  --radius: 16px;
+  --radius-sm: 11px;
+}
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 12% 0%, #fbf7ef 0%, rgba(251, 247, 239, 0) 46%),
+    radial-gradient(circle at 88% 6%, #f8f3ea 0%, rgba(248, 243, 234, 0) 42%),
+    var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 15px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+h1, h2, h3, h4 { margin: 0; line-height: 1.35; font-weight: 700; }
+p { margin: 0; }
+button, input, select, textarea { font-family: inherit; }
+a { color: var(--accent); }
+
+/* ============================================================
+   1. 顶栏与页签
+   ============================================================ */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgba(245, 241, 232, .88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+.topbar-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 11px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.brand { display: flex; flex-direction: column; gap: 1px; }
+.brand-title { font-size: 17px; font-weight: 700; letter-spacing: .4px; }
+.brand-title i {
+  font-style: normal;
+  color: var(--accent);
+}
+.brand-sub { font-size: 11.5px; color: var(--ink-3); letter-spacing: .12em; }
+.tabs {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #ece5d8;
+  border-radius: 13px;
+}
+.tab {
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 14px;
+  padding: 8px 15px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background .18s ease, color .18s ease, box-shadow .18s ease;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] {
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 720px) {
+  .tabs { margin-left: 0; width: 100%; flex-wrap: wrap; }
+  .tab { flex: 1 1 auto; padding: 8px 8px; font-size: 13px; text-align: center; }
+}
+
+/* ============================================================
+   2. 页面容器与面板
+   ============================================================ */
+.page { max-width: 1120px; margin: 0 auto; padding: 26px 20px 90px; }
+.panel[hidden] { display: none !important; }
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.card-flat {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 30px 0 14px;
+}
+.section-title h2 { font-size: 18px; }
+.section-title span { font-size: 12.5px; color: var(--ink-3); }
+
+/* ============================================================
+   3. 通用控件
+   ============================================================ */
+.field { display: flex; flex-direction: column; gap: 7px; }
+.f-label {
+  font-size: 11.5px;
+  letter-spacing: .16em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+.input, .select, .textarea {
+  width: 100%;
+  font-size: 15px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 11px 13px;
+  outline: none;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+.input::placeholder, .textarea::placeholder { color: #b7ae9f; }
+.input:focus, .select:focus, .textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.textarea { resize: vertical; min-height: 62px; line-height: 1.6; }
+.select { cursor: pointer; appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%), linear-gradient(135deg, var(--ink-3) 50%, transparent 50%); background-position: calc(100% - 18px) 52%, calc(100% - 13px) 52%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 34px; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 11px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform .12s ease, filter .16s ease, background .16s ease, border-color .16s ease;
+  white-space: nowrap;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--accent); color: #fff; box-shadow: 0 6px 16px rgba(169, 85, 44, .22); }
+.btn-primary:hover { filter: brightness(1.06); }
+.btn-ghost { background: #fff; border-color: var(--line); color: var(--ink); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-green { background: var(--green); color: #fff; }
+.btn-green:hover { filter: brightness(1.06); }
+.btn-sm { padding: 7px 13px; font-size: 13px; border-radius: 9px; font-weight: 500; }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink-2);
+  border-radius: 999px;
+  padding: 5px 13px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: .16s ease;
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.chip.sug { border-color: #e7cf9c; background: var(--amber-soft); color: #8a5f16; }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--line-2);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.pill-accent { background: var(--accent-soft); color: var(--accent); }
+.pill-green { background: var(--green-soft); color: var(--green); }
+.pill-amber { background: var(--amber-soft); color: #8a5f16; }
+.pill-red { background: var(--red-soft); color: var(--red); }
+.hint { font-size: 13px; color: var(--ink-3); }
+.err { font-size: 13px; color: var(--red); }
+.mono { font-variant-numeric: tabular-nums; }
+.hidden { display: none !important; }
+
+/* ============================================================
+   4. 起始页
+   ============================================================ */
+.start { padding: 34px 34px 30px; }
+.start-kicker {
+  font-size: 11.5px;
+  letter-spacing: .2em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.start h1 { font-size: 29px; letter-spacing: -.2px; margin-bottom: 10px; }
+.start h1 em { font-style: normal; color: var(--accent); }
+.start-desc { color: var(--ink-2); max-width: 640px; font-size: 14.5px; }
+.start-form { display: grid; grid-template-columns: 1fr 150px 150px; gap: 14px; margin-top: 26px; align-items: end; }
+@media (max-width: 780px) { .start-form { grid-template-columns: 1fr; } }
+.start-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+.start-books { margin-top: 26px; padding-top: 20px; border-top: 1px dashed var(--line); }
+.start-books .f-label { margin-bottom: 10px; display: block; }
+.flow-strip {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+@media (max-width: 860px) { .flow-strip { grid-template-columns: repeat(2, 1fr); } }
+.flow-cell {
+  background: var(--line-2);
+  border-radius: 10px;
+  padding: 10px 11px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+.flow-cell b { display: block; color: var(--ink); font-size: 13px; margin-bottom: 2px; }
+
+/* ============================================================
+   5. 章节弹框（固定高度 + 右侧独立滚动条）
+   ============================================================ */
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(38, 32, 24, .48);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: maskIn .16s ease;
+}
+.modal-mask[hidden] { display: none !important; }
+@keyframes maskIn { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+  width: min(700px, 100%);
+  height: min(78vh, 660px);          /* 固定高度：内容再多也不撑破页面 */
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(30, 22, 12, .28);
+  overflow: hidden;                  /* 滚动只发生在 modal-body 内 */
+  animation: modalIn .18s ease;
+}
+@keyframes modalIn { from { opacity: 0; transform: translateY(8px) scale(.99); } to { opacity: 1; transform: none; } }
+@media (max-width: 640px) { .modal { height: 84vh; border-radius: 14px; } .modal-mask { padding: 10px; } }
+.modal:focus { outline: none; }
+.modal-head {
+  flex: 0 0 auto;
+  padding: 16px 22px 12px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.modal-head h3 { font-size: 16.5px; }
+.modal-head p { font-size: 12.5px; color: var(--ink-3); margin-top: 3px; }
+.modal-close {
+  margin-left: auto;
+  flex: 0 0 auto;
+  border: 0;
+  background: var(--line-2);
+  color: var(--ink-2);
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+}
+.modal-close:hover { background: var(--accent-soft); color: var(--accent); }
+.modal-info {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 11px 22px;
+  background: #faf6ec;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.8px;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+.modal-info b { color: var(--ink); }
+.modal-tools {
+  flex: 0 0 auto;
+  padding: 9px 22px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  border-bottom: 1px dashed var(--line);
+  background: var(--paper);
+}
+/* 独立滚动区：高度由 flex 撑满，滚动条只在这里 */
+.modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 10px 12px 16px;
+  scrollbar-gutter: stable;
+}
+.modal-body::-webkit-scrollbar { width: 9px; }
+.modal-body::-webkit-scrollbar-track { background: #f4efe4; border-radius: 9px; }
+.modal-body::-webkit-scrollbar-thumb { background: #cfc3ae; border-radius: 9px; }
+.modal-body::-webkit-scrollbar-thumb:hover { background: #b9ab93; }
+.modal-foot {
+  flex: 0 0 auto;
+  padding: 12px 22px 14px;
+  border-top: 1px solid var(--line);
+  background: #fbf7ef;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.modal-count { font-size: 13px; color: var(--ink-2); }
+.modal-count b { color: var(--accent); font-size: 15px; }
+.modal-foot .btn { margin-left: auto; }
+
+/* 章节行 */
+.chk {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 9px 12px 9px 10px;
+  border-radius: 11px;
+  cursor: pointer;
+  transition: background .14s ease;
+  border: 1px solid transparent;
+}
+.chk:hover { background: #f8f3e8; }
+.chk.sug { background: var(--amber-soft); border-color: #efdfba; }
+.chk input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin: 3px 0 0;
+  width: 17px;
+  height: 17px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.chk-body { min-width: 0; flex: 1 1 auto; }
+.chk-n { font-weight: 700; color: var(--ink-2); font-size: 13px; margin-right: 6px; font-variant-numeric: tabular-nums; }
+.chk-t { font-size: 14.5px; font-weight: 600; }
+.chk-d { display: block; font-size: 12.5px; color: var(--ink-3); margin-top: 3px; line-height: 1.55; }
+.chk.sug .chk-n { color: var(--amber); }
+.chk-empty { padding: 30px 20px; text-align: center; color: var(--ink-3); font-size: 14px; }
+
+/* ============================================================
+   6. 计划页
+   ============================================================ */
+.plan-top {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 18px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+@media (max-width: 840px) { .plan-top { grid-template-columns: 1fr; } }
+.plan-top h2 { font-size: 20px; margin-bottom: 4px; }
+.plan-top h2 span { color: var(--accent); }
+.plan-sub { font-size: 13px; color: var(--ink-3); }
+.meta-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 16px; }
+.meta-cell { background: var(--line-2); border-radius: 11px; padding: 9px 12px; }
+.meta-cell b { display: block; font-size: 19px; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.meta-cell span { font-size: 11.5px; color: var(--ink-3); letter-spacing: .06em; }
+.progress-wrap { display: flex; flex-direction: column; gap: 9px; justify-content: center; }
+.progress-head { display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--ink-2); }
+.progress-head b { font-size: 22px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.bar { height: 9px; background: #ece5d8; border-radius: 999px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--amber)); transition: width .35s ease; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--ink-3); }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 3px; margin-right: 5px; vertical-align: 1px; }
+
+.plan-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.plan-toolbar .select { width: auto; min-width: 130px; padding-top: 7px; padding-bottom: 7px; }
+.plan-toolbar .spacer { flex: 1 1 auto; }
+
+/* 天卡片 */
+.day {
+  display: flex;
+  gap: 16px;
+  padding: 16px 18px 16px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: 13px;
+  margin-bottom: 11px;
+  transition: opacity .2s ease, box-shadow .2s ease;
+}
+.day.node { border-left-color: var(--amber); background: linear-gradient(180deg, #fffcf3, #fffdf9); }
+.day.done { opacity: .55; }
+.day-check { flex: 0 0 auto; padding-top: 2px; }
+.day-check input { width: 19px; height: 19px; accent-color: var(--green); cursor: pointer; }
+.day-main { flex: 1 1 auto; min-width: 0; }
+.day-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.day-no { font-weight: 700; font-size: 15.5px; font-variant-numeric: tabular-nums; }
+.day-no.node-no { color: #8a5f16; }
+.day-phase {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  letter-spacing: .04em;
+}
+.day-title { font-size: 14px; color: var(--ink-2); margin-top: 3px; }
+.day-secs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.sec-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  border: 1px dashed #ddd2bd;
+  border-radius: 8px;
+  padding: 3px 9px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  background: #fff;
+  max-width: 100%;
+}
+.sec-pill b { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+.sec-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.tasks { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.tasks li { display: flex; gap: 8px; align-items: baseline; font-size: 13.4px; color: var(--ink-2); }
+.tasks li > b { flex: 0 0 auto; color: var(--ink); font-weight: 600; }
+.tasks .min { flex: 0 0 auto; color: var(--accent); font-size: 11.5px; font-variant-numeric: tabular-nums; background: var(--accent-soft); border-radius: 6px; padding: 0 6px; }
+.tasks .desc { min-width: 0; }
+.tip {
+  margin-top: 10px;
+  font-size: 12.8px;
+  color: #8a5f16;
+  background: var(--amber-soft);
+  border-radius: 9px;
+  padding: 7px 11px;
+}
+.warn-box {
+  border: 1px solid #eccfca;
+  background: var(--red-soft);
+  color: #8c2f2f;
+  border-radius: 11px;
+  padding: 11px 14px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+/* ============================================================
+   7. 六步学习法
+   ============================================================ */
+.method-hero { padding: 26px 26px 22px; margin-bottom: 8px; }
+.method-hero h2 { font-size: 24px; margin-bottom: 8px; }
+.method-hero p { color: var(--ink-2); font-size: 14.5px; max-width: 780px; }
+.method-main {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 0 10px 10px 0;
+  font-size: 13.8px;
+  color: #7d3d1e;
+  line-height: 1.7;
+}
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 560px; }
+th, td { text-align: left; padding: 10px 13px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+th { background: #faf6ec; font-weight: 600; color: var(--ink); font-size: 13px; white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+td b { color: var(--accent); font-weight: 600; }
+.step-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 18px 20px;
+  margin-bottom: 12px;
+}
+.step-head { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; }
+.step-no {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+.step-head h3 { font-size: 16.5px; }
+.step-tools { font-size: 12.5px; color: var(--ink-3); margin: 8px 0 0; }
+.step-do { margin: 10px 0 0; padding-left: 20px; color: var(--ink-2); font-size: 13.8px; }
+.step-do li { margin-bottom: 4px; }
+.step-key { margin-top: 10px; font-size: 13px; color: #7d3d1e; background: var(--accent-soft); padding: 8px 11px; border-radius: 9px; }
+.avoid-list { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+@media (max-width: 720px) { .avoid-list { grid-template-columns: 1fr; } }
+.avoid-item {
+  display: flex;
+  gap: 9px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 11px 13px;
+  font-size: 13.4px;
+  color: var(--ink-2);
+}
+.avoid-item span:first-child { color: var(--red); font-weight: 700; flex: 0 0 auto; }
+.chant {
+  background: #2b2a26;
+  color: #f4eee2;
+  border-radius: 14px;
+  padding: 22px 24px;
+  line-height: 2;
+  font-size: 15px;
+  letter-spacing: .04em;
+}
+.chant small { display: block; margin-top: 12px; color: #bdb29d; font-size: 12.8px; letter-spacing: .02em; }
+
+/* ============================================================
+   8. 番茄钟
+   ============================================================ */
+.pomo-wrap { padding: 30px 26px 26px; }
+.pomo-modes { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+.pomo-mode {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink-2);
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: .16s ease;
+}
+.pomo-mode[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.pomo-clock {
+  text-align: center;
+  font-size: clamp(56px, 13vw, 84px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .02em;
+  line-height: 1.1;
+  color: var(--ink);
+}
+.pomo-clock.running { color: var(--accent); }
+.pomo-state { text-align: center; font-size: 13.5px; color: var(--ink-3); margin-top: 6px; }
+.pomo-dots { display: flex; gap: 7px; justify-content: center; margin-top: 16px; }
+.pomo-dot { width: 11px; height: 11px; border-radius: 50%; background: #e7dfd0; transition: .2s ease; }
+.pomo-dot.on { background: var(--accent); transform: scale(1.12); }
+.pomo-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
+.pomo-task { max-width: 520px; margin: 22px auto 0; }
+.pomo-stat { display: flex; gap: 24px; justify-content: center; margin-top: 22px; font-size: 13px; color: var(--ink-3); flex-wrap: wrap; }
+.pomo-stat b { color: var(--ink); font-size: 17px; font-variant-numeric: tabular-nums; margin-right: 4px; }
+.pomo-note {
+  max-width: 640px;
+  margin: 26px auto 0;
+  padding-top: 18px;
+  border-top: 1px dashed var(--line);
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.75;
+}
+.pomo-note b { color: var(--accent); }
+
+/* ============================================================
+   9. 知识点总结
+   ============================================================ */
+.notes-grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+.note-form { padding: 22px 24px; }
+.note-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+@media (max-width: 760px) { .note-form-grid { grid-template-columns: 1fr; } }
+.note-form-grid .full { grid-column: 1 / -1; }
+.note-list-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 12px; }
+.note-list-head h3 { font-size: 16px; }
+.note-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 15px 17px;
+  margin-bottom: 11px;
+}
+.note-card-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.note-card-head h4 { font-size: 15.5px; flex: 1 1 auto; }
+.note-row { display: flex; gap: 9px; font-size: 13.6px; margin-top: 7px; color: var(--ink-2); }
+.note-row .k { flex: 0 0 auto; color: var(--ink-3); font-size: 12.5px; min-width: 62px; }
+.note-row .v { flex: 1 1 auto; }
+.note-ext { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+@media (max-width: 720px) { .note-ext { grid-template-columns: 1fr; } }
+.note-ext div { background: var(--line-2); border-radius: 9px; padding: 7px 10px; font-size: 12.6px; color: var(--ink-2); }
+.note-ext div span { display: block; color: var(--ink-3); font-size: 11.5px; margin-bottom: 2px; }
+.quiz .ans { filter: blur(4.5px); user-select: none; transition: filter .2s ease; }
+.quiz .note-card.revealed .ans { filter: none; user-select: auto; }
+.note-empty { text-align: center; color: var(--ink-3); font-size: 13.5px; padding: 32px 0; }
+.note-actions { margin-left: auto; display: flex; gap: 6px; }
+
+/* ============================================================
+   10. 底部
+   ============================================================ */
+.foot {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+  color: var(--ink-3);
+  font-size: 12.3px;
+  line-height: 1.7;
+}
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 34px;
+  transform: translate(-50%, 14px);
+  background: #2b2a26;
+  color: #f6f1e4;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  box-shadow: 0 10px 30px rgba(20, 15, 8, .28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+  z-index: 80;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media print { .topbar, .plan-toolbar, .foot, .toast { display: none !important; } }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-title">学习闭环 <i>·</i> 30天计划生成器</div>
+      <div class="brand-sub">检索练习 × 间隔重复 × 穿插混合</div>
+    </div>
+    <div class="tabs" role="tablist" aria-label="功能页签">
+      <button class="tab" id="tabPlan" role="tab" aria-selected="true" aria-controls="panelPlan">学习计划</button>
+      <button class="tab" id="tabMethod" role="tab" aria-selected="false" aria-controls="panelMethod">六步学习法</button>
+      <button class="tab" id="tabPomodoro" role="tab" aria-selected="false" aria-controls="panelPomodoro">番茄钟</button>
+      <button class="tab" id="tabNotes" role="tab" aria-selected="false" aria-controls="panelNotes">知识点总结</button>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+
+  <!-- ========================= 面板一：学习计划 ========================= -->
+  <section class="panel" id="panelPlan" role="tabpanel" aria-labelledby="tabPlan">
+
+    <!-- 起始页 -->
+    <div id="startView">
+      <div class="card start">
+        <div class="start-kicker">Step 0 · 选一本要攻克的书</div>
+        <h1>把一本书拆成 <em>31 天</em> 的可执行闭环</h1>
+        <p class="start-desc">
+          输入书名或科目 → 勾选要学的章节 → 自动排出 Day 0 到 Day 30 的逐天动作。
+          Day 0／1／3／7／14／30 这 6 天是固定的闭卷检索节点，不会被新内容挤掉。
+        </p>
+
+        <div class="start-form">
+          <div class="field">
+            <label class="f-label" for="inputSubject">书名 / 科目</label>
+            <div style="display:flex; gap:8px;">
+              <input class="input" id="inputSubject" type="text" autocomplete="off"
+                     placeholder="例：认知天性 / 教育学原理 / 数据结构">
+              <button class="btn btn-ghost" id="btnSearch" type="button">🔍 查章节</button>
+            </div>
+          </div>
+          <div class="field">
+            <label class="f-label" for="selDailyMin">每天投入</label>
+            <select class="select" id="selDailyMin">
+              <option value="30">30 分钟</option>
+              <option value="45">45 分钟</option>
+              <option value="60" selected>60 分钟</option>
+              <option value="90">90 分钟</option>
+              <option value="120">120 分钟</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="f-label">已选章节</label>
+            <div class="card-flat" style="padding:11px 13px; display:flex; align-items:baseline; gap:6px;">
+              <b id="startSelectedCount" style="font-size:18px; color:var(--accent); font-variant-numeric:tabular-nums;">0</b>
+              <span class="hint" id="startSelectedBook">未选择书目</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="start-actions">
+          <button class="btn btn-primary" id="btnGenerate" type="button">生成我的学习计划</button>
+          <button class="btn btn-ghost" id="btnOpenPicker" type="button">重新选章节</button>
+          <span class="err" id="startErr" hidden></span>
+        </div>
+
+        <div class="start-books">
+          <span class="f-label">内置书目（点一下直接查）</span>
+          <div class="chips" id="startBooks"></div>
+        </div>
+
+        <div class="flow-strip">
+          <div class="flow-cell"><b>① 带问题进场</b>扫目录，先立 3 个问题</div>
+          <div class="flow-cell"><b>② 只记关键词</b>不抄长句，按信息类型记</div>
+          <div class="flow-cell"><b>③ 闭卷默框架</b>当天这次就是第 0 次检索</div>
+          <div class="flow-cell"><b>④ 三句话补漏</b>定义 + 区别 + 例子，当天解决</div>
+          <div class="flow-cell"><b>⑤ 讲一遍成网</b>三方向拓展，笔记变题库</div>
+          <div class="flow-cell"><b>⑥ 间隔检索</b>0/1/3/7/14/30 天闭卷</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 计划页 -->
+    <div id="planView" hidden>
+      <div class="card plan-top">
+        <div>
+          <h2>《<span id="planSubject">—</span>》 · 31 天闭环</h2>
+          <p class="plan-sub" id="planSub">—</p>
+          <div class="meta-grid">
+            <div class="meta-cell"><b id="metaSections">0</b><span>章 / 节</span></div>
+            <div class="meta-cell"><b id="metaDaily">0</b><span>每天分钟</span></div>
+            <div class="meta-cell"><b id="metaNodeDays">6</b><span>检索节点</span></div>
+            <div class="meta-cell"><b id="metaStudyDays">0</b><span>学习日</span></div>
+          </div>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-head"><b id="progressNum">0</b><span>/ 31 天已打卡</span></div>
+          <div class="bar"><i id="planProgressBar"></i></div>
+          <div class="legend">
+            <span><i style="background:var(--amber);"></i>检索节点日</span>
+            <span><i style="background:var(--line);"></i>学新内容日</span>
+          </div>
+          <div class="btn-row" style="margin-top:8px;">
+            <button class="btn btn-ghost btn-sm" id="btnRegenerate" type="button">↻ 重新生成</button>
+            <button class="btn btn-ghost btn-sm" id="btnResetProgress" type="button">清空打卡</button>
+            <button class="btn btn-ghost btn-sm" id="btnBackStart" type="button">换一本书</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="warn-box" id="planWarn" hidden></div>
+
+      <div class="plan-toolbar">
+        <label class="f-label" for="selFilter" style="align-self:center;">筛选</label>
+        <select class="select" id="selFilter">
+          <option value="all">全部 31 天</option>
+          <option value="node">只看检索节点日</option>
+          <option value="todo">只看未打卡</option>
+        </select>
+        <div class="spacer"></div>
+        <span class="hint" id="planCountHint"></span>
+      </div>
+
+      <div id="planList"></div>
+    </div>
+  </section>
+
+  <!-- ========================= 面板二：六步学习法 ========================= -->
+  <section class="panel" id="panelMethod" role="tabpanel" aria-labelledby="tabMethod" hidden>
+    <div id="methodRoot"></div>
+  </section>
+
+  <!-- ========================= 面板三：番茄钟 ========================= -->
+  <section class="panel" id="panelPomodoro" role="tabpanel" aria-labelledby="tabPomodoro" hidden>
+    <div class="card pomo-wrap">
+      <div class="pomo-modes" role="group" aria-label="番茄钟模式">
+        <button class="pomo-mode" id="pomoModeFocus" type="button" data-mode="focus" aria-pressed="true">专注 25 分钟</button>
+        <button class="pomo-mode" id="pomoModeShort" type="button" data-mode="short" aria-pressed="false">短休息 5 分钟</button>
+        <button class="pomo-mode" id="pomoModeLong" type="button" data-mode="long" aria-pressed="false">长休息 20 分钟</button>
+      </div>
+      <div class="pomo-clock" id="pomoClock">25:00</div>
+      <div class="pomo-state" id="pomoState">先骗自己坐下来，坐下来就赢了一半</div>
+      <div class="pomo-dots" id="pomoDots"></div>
+      <div class="pomo-actions">
+        <button class="btn btn-primary" id="btnPomoStart" type="button">开始</button>
+        <button class="btn btn-ghost" id="btnPomoReset" type="button">重置</button>
+        <button class="btn btn-ghost" id="btnPomoSkip" type="button">跳过</button>
+      </div>
+      <div class="pomo-task field">
+        <label class="f-label" for="pomoTask">这个番茄做什么</label>
+        <input class="input" id="pomoTask" type="text" placeholder="例：认知天性 第 3 章 · 闭卷默框架">
+      </div>
+      <div class="pomo-stat">
+        <span><b id="pomoToday">0</b>今天完成</span>
+        <span><b id="pomoTotal">0</b>累计番茄</span>
+        <span><b id="pomoCycle">0</b>/ 4 进入长休息</span>
+      </div>
+      <div class="pomo-note">
+        <b>用法：</b>25 分钟只做一件事，手机扔远；响铃后真休息 5 分钟（站起来走动、喝水，别刷手机）；
+        每 4 个番茄钟休息 20 分钟。卡壳超过 15 分钟没思路，就停下来去散步——切发散模式，别硬扛。
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================= 面板四：知识点总结 ========================= -->
+  <section class="panel" id="panelNotes" role="tabpanel" aria-labelledby="tabNotes" hidden>
+    <div class="card note-form">
+      <h3 style="font-size:17px;">知识点总结 · 三句话 + 三方向</h3>
+      <p class="hint" style="margin-top:5px;">
+        每个模糊点写三句话（定义 / 区别 / 例子），再补三方向拓展。数据只存在你自己的浏览器里，不联网。
+      </p>
+      <div class="note-form-grid">
+        <div class="field full">
+          <label class="f-label" for="noteTitle">知识点</label>
+          <input class="input" id="noteTitle" type="text" placeholder="例：复利">
+        </div>
+        <div class="field">
+          <label class="f-label" for="noteDef">一句定义</label>
+          <input class="input" id="noteDef" type="text" placeholder="用自己的话说，它到底是什么">
+        </div>
+        <div class="field">
+          <label class="f-label" for="noteDiff">一句区别</label>
+          <input class="input" id="noteDiff" type="text" placeholder="它和我已经会的哪个像、差在哪">
+        </div>
+        <div class="field full">
+          <label class="f-label" for="noteEx">一句例子</label>
+          <input class="input" id="noteEx" type="text" placeholder="一个能拿它解释的真实小例子">
+        </div>
+        <div class="field">
+          <label class="f-label" for="noteDeep">深度拓展</label>
+          <input class="input" id="noteDeep" type="text" placeholder="来龙去脉：怎么来的、怎么推导">
+        </div>
+        <div class="field">
+          <label class="f-label" for="noteWide">横向拓展</label>
+          <input class="input" id="noteWide" type="text" placeholder="还有哪些类似的">
+        </div>
+        <div class="field full">
+          <label class="f-label" for="noteVertical">纵向拓展</label>
+          <input class="input" id="noteVertical" type="text" placeholder="能不能跨领域用（最高级）">
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:14px;">
+        <button class="btn btn-primary btn-sm" id="btnAddNote" type="button">保存这个知识点</button>
+        <span class="err" id="noteErr" hidden></span>
+      </div>
+    </div>
+
+    <div class="note-list-head">
+      <h3>我的知识卡片</h3>
+      <span class="hint" id="noteCount">0 条</span>
+      <div class="note-actions">
+        <input class="input" id="noteSearch" type="text" placeholder="搜索知识点" style="width:170px; padding:7px 11px; font-size:13px;">
+        <button class="btn btn-ghost btn-sm" id="btnQuizToggle" type="button" aria-pressed="false">开始自测</button>
+        <button class="btn btn-ghost btn-sm" id="btnExportNotes" type="button">导出 txt</button>
+      </div>
+    </div>
+    <div id="noteList"></div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  单文件 · 零依赖 · 双击即可离线运行。数据（选中的章节、打卡记录、知识卡片）只保存在本机浏览器 localStorage。
+</footer>
+
+<!-- ========================= 章节弹框 ========================= -->
+<div class="modal-mask" id="chapterModal" hidden>
+  <div class="modal" id="modalBox" role="dialog" aria-modal="true" aria-labelledby="modalTitle" tabindex="-1">
+    <div class="modal-head">
+      <div>
+        <h3 id="modalTitle">章节目录</h3>
+        <p id="modalBook">—</p>
+      </div>
+      <button class="modal-close" id="btnCloseModal" type="button" aria-label="关闭">✕</button>
+    </div>
+    <div class="modal-info" id="modalInfo"></div>
+    <div class="modal-tools">
+      <button class="btn btn-ghost btn-sm" id="btnSelectSuggest" type="button">只选建议章节</button>
+      <button class="btn btn-ghost btn-sm" id="btnClearAll" type="button">全不选</button>
+      <span class="hint">点整行就能勾选</span>
+    </div>
+    <div class="modal-body" id="modalList"></div>
+    <div class="modal-foot">
+      <div class="modal-count" id="modalCount">已选 <b>0</b> 章 / 共 0 章</div>
+      <button class="btn btn-primary btn-sm" id="btnConfirmChapters" type="button">用这些章节生成</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   A. 章节目录数据
+   ------------------------------------------------------------------
+   铁律一：每一条章节必须是对象 {n, title, desc}。
+   绝不许写成 [n, title, desc] 这种三元组数组，否则页面上全是 undefined。
+   ============================================================ */
+const CHAPTERS = {
+
+  '认知天性': {
+    info: '《认知天性》：检索练习、间隔重复、穿插与多样化、合意困难。这一本管“巩固与记忆”。',
+    suggest: [1, 2, 3, 4, 6],
+    note: '建议先吃透第 1—4 章（提取优先、三道工序、合意困难、间隔穿插），第 6、8 章讲的是怎么把方法变成习惯。',
+    list: [
+      { n: 1, title: '学习是挑战：提取比输入更重要', desc: '划线、反复阅读带来的是熟悉感，不等于学会' },
+      { n: 2, title: '编码、巩固、检索：记忆的三道工序', desc: '为什么“合上书能拽出来”才算数' },
+      { n: 3, title: '合意困难：学得越顺，忘得越快', desc: '卡一下、想一下、失败后再想起来，留存最牢' },
+      { n: 4, title: '间隔与穿插：把练习打散才留得住', desc: '为什么集中突击三小时不如分三天' },
+      { n: 5, title: '多样化练习：换外衣，不换原理', desc: '换场景会乱，说明还没迁移' },
+      { n: 6, title: '心智模型：把知识连成一张网', desc: '单个点记不住，点和点连起来才记得牢' },
+      { n: 7, title: '两个迷思：学习风格与“一万小时”', desc: '按“视觉型/听觉型”分科学习，基本无效' },
+      { n: 8, title: '终身学习者：把方法变成习惯', desc: '授人以渔：怎么给自己排课、怎么自测' }
+    ]
+  },
+
+  '学习之道': {
+    info: '《学习之道》（芭芭拉·奥克利）：专注与发散、组块化、拖延与番茄工作法。这一本管“启动与专注”。',
+    suggest: [1, 3, 4, 6, 8],
+    note: '第 1、3、4 章是模式切换和组块化的地基，第 6 章拖延最适合配合番茄钟一起用。',
+    list: [
+      { n: 1, title: '开启大门：专注模式与发散模式', desc: '聚光灯打一点，灯笼照一片' },
+      { n: 2, title: '放松点：别和大脑硬碰硬', desc: '卡住时先离开，后台会替你想' },
+      { n: 3, title: '学习即创造：组块是怎么长出来的', desc: '从零散信息到能一把抓起来的组块' },
+      { n: 4, title: '组块化：从理解到打包', desc: '先理解，再练习，最后能整块调用' },
+      { n: 5, title: '心理意象：给抽象的东西一个画面', desc: '把概念变成能“看见”的东西' },
+      { n: 6, title: '拖延：不是懒，是“开始”被绑成痛苦', desc: '番茄工作法：先坐下 25 分钟' },
+      { n: 7, title: '分心：关掉干扰的开关', desc: '手机扔远，比意志力更管用' },
+      { n: 8, title: '记忆：间隔重复与记忆宫殿', desc: '随意信息（人名、日期、公式）专用' },
+      { n: 9, title: '工具与清单：把动作外置', desc: '计划写下来，脑子留给思考' },
+      { n: 10, title: '考试：先难题还是先简单题', desc: '考前的正确动作是闭卷检索，不是再看一遍' },
+      { n: 11, title: '数学与科学的学习法', desc: '例题—变式—判据，三步走' },
+      { n: 12, title: '学习即生活：把闭环变成习惯', desc: '让方法活成日常，而不是一次性冲刺' }
+    ]
+  },
+
+  '如何高效学习': {
+    info: '《如何高效学习》（斯科特·扬）：整体性学习、比喻、内在化、拓展三方向、信息分类。这一本管“理解与建网”。',
+    suggest: [1, 3, 7, 8],
+    note: '第 1 章先立“成网”的观念，第 7 章三方向拓展和第 8 章信息分类，是每天都要用到的工具。',
+    list: [
+      { n: 1, title: '整体性学习：知识要成网不要成点', desc: '你不是在背一个个点，是在织一张网' },
+      { n: 2, title: '结构、模型与高速公路', desc: '结构是地图，模型是路口，高速是捷径' },
+      { n: 3, title: '笔记流：把笔记写成一张图', desc: '箭头连起来，比一行行抄强得多' },
+      { n: 4, title: '比喻法：用熟悉解释陌生', desc: '新知识挂到旧知识上才不掉' },
+      { n: 5, title: '内在化：加画面、加感觉', desc: '具体信息：看得见摸得着才记得住' },
+      { n: 6, title: '记忆宫殿与挂钩法', desc: '把要记的东西放进你熟悉的空间' },
+      { n: 7, title: '拓展三方向：深度 / 横向 / 纵向', desc: '来龙去脉、相似项、跨领域用' },
+      { n: 8, title: '信息分类：不同信息用不同学法', desc: '随意、观点、过程、具体、抽象五类' },
+      { n: 9, title: '成为高效率学生：能量、习惯、环境', desc: '精力管理比时间管理更底层' },
+      { n: 10, title: '自我教育：给自己排课', desc: '没有老师时，怎么自己搭反馈回路' }
+    ]
+  },
+
+  '教育学原理': {
+    info: '教育学原理（通用教材版）：从教育概念到课程、教学、德育、评价的完整框架。',
+    suggest: [1, 3, 5, 7, 8, 10],
+    note: '第 1—5 章是概念地基，第 7—10 章（课程、教学、德育）是考试主战场，建议优先成网。',
+    list: [
+      { n: 1, title: '教育与教育学的发展', desc: '教育是怎么从经验变成一门学科的' },
+      { n: 2, title: '教育的概念与基本要素', desc: '教育者、受教育者、教育影响三要素' },
+      { n: 3, title: '教育与人的发展', desc: '身心发展规律与影响因素' },
+      { n: 4, title: '教育与社会的发展', desc: '政治、经济、文化对教育的制约与反作用' },
+      { n: 5, title: '教育目的与教育价值', desc: '培养什么人、为谁培养人' },
+      { n: 6, title: '教育制度与学制', desc: '学制的类型与我国学制演变' },
+      { n: 7, title: '课程：课程类型与课程设计', desc: '课程目标、内容、实施与评价' },
+      { n: 8, title: '教学：教学过程与教学原则', desc: '教学的本质、过程规律与基本原则' },
+      { n: 9, title: '教学方法与教学组织形式', desc: '班级授课制与各类教学方法的适用场景' },
+      { n: 10, title: '德育：目标、内容与途径', desc: '德育过程规律与常见德育模式' },
+      { n: 11, title: '教师与学生', desc: '教师角色、专业发展与学生观' },
+      { n: 12, title: '教育评价与教育研究', desc: '评价类型、指标与基本研究方法' }
+    ]
+  },
+
+  '数据结构': {
+    info: '数据结构（C 语言版）：线性表、栈队列、树、图、查找与排序。理工科最需要“画图成网”的一门课。',
+    suggest: [1, 2, 5, 6, 7, 8],
+    note: '第 1 章复杂度是全书判据，第 5、6 章（树、图）最需要闭卷画图，第 7、8 章适合穿插混练。',
+    list: [
+      { n: 1, title: '绪论：数据结构与算法复杂度', desc: '时间/空间复杂度，全书判据的来源' },
+      { n: 2, title: '线性表：顺序存储与链式存储', desc: '两种存储的插入删除代价对比' },
+      { n: 3, title: '栈与队列', desc: '受限线性表的典型应用场景' },
+      { n: 4, title: '串、数组与广义表', desc: '模式匹配与压缩存储' },
+      { n: 5, title: '树与二叉树', desc: '遍历、线索化、哈夫曼树' },
+      { n: 6, title: '图：存储、遍历与最短路径', desc: '邻接矩阵/邻接表、DFS/BFS、最短路' },
+      { n: 7, title: '查找：顺序、折半与哈希', desc: '平均查找长度的计算与冲突处理' },
+      { n: 8, title: '排序：插入、交换、选择、归并', desc: '各排序的稳定性、复杂度与适用场景' },
+      { n: 9, title: '文件与外部排序', desc: '多路归并与置换选择' },
+      { n: 10, title: '综合应用与算法设计', desc: '把前面几章混起来做判据题' }
+    ]
+  },
+
+  '四级核心词汇': {
+    info: '四级核心词汇（按单元切分）：典型的“孤立记忆”材料，最适合老实按间隔重复刷。',
+    suggest: [1, 2, 3, 4, 5, 6],
+    note: '词汇属于孤立信息，不必强行穿插练“选哪招”，按 0/1/3/7/14/30 天的间隔闭卷回想即可。',
+    list: [
+      { n: 1, title: 'Unit 1 · 高频动词', desc: '约 300 词：动作类核心动词与搭配' },
+      { n: 2, title: 'Unit 2 · 高频名词', desc: '约 300 词：抽象名词与学术场景名词' },
+      { n: 3, title: 'Unit 3 · 形容词与副词', desc: '约 300 词：态度、程度、评价类' },
+      { n: 4, title: 'Unit 4 · 短语与固定搭配', desc: '约 200 条：动词短语、介词搭配' },
+      { n: 5, title: 'Unit 5 · 易混词辨析', desc: '形近、义近词的判据对比' },
+      { n: 6, title: 'Unit 6 · 阅读高频长难句', desc: '从句与倒装结构的拆解练习' }
+    ]
+  }
+};
+
+/* 别名表：同一个东西的不同叫法，检索时一起命中 */
+const ALIASES = {
+  '认知天性': ['make it stick', 'makeitstick', '认知', '认知天性：让学习轻而易举的心理学规律', '布朗'],
+  '学习之道': ['a mind for numbers', 'amindfornumbers', '学习之道：如何高效学习', '奥克利', '芭芭拉·奥克利'],
+  '如何高效学习': ['learn more study less', 'learnmorestudyless', '斯科特·扬', '斯科特扬', '整体性学习'],
+  '教育学原理': ['教育学', '教育学基础', '教育学概论', '教原'],
+  '数据结构': ['数据结构c语言版', '数据结构与算法', 'ds'],
+  '四级核心词汇': ['四级词汇', '英语四级', 'cet4', 'cet-4', '核心词汇']
+};
+
+/* ============================================================
+   B. 基础工具
+   ============================================================ */
+const PUNCT_RE = /[\s\u3000\u200b《》〈〉“”"'‘’`、，。：；！？·—…（）()\[\]【】{}<>\/\\|~\-,.;:!?#@$%^&*+=]/g;
+
+/** 去空格、去标点、转小写 —— 检索的第一道规范化 */
+function norm(s) {
+  return String(s == null ? '' : s).toLowerCase().replace(PUNCT_RE, '');
+}
+
+/** HTML 转义：所有拼接进页面的文本都必须过一遍 */
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** 取唯一元素 */
+function $(id) {
+  return document.getElementById(id);
+}
+
+/** 安全读写 localStorage：某些浏览器在本地文件下会禁用，不能让它把页面搞崩 */
+const store = {
+  get(key, fallback) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (raw == null) return fallback;
+      return JSON.parse(raw);
+    } catch (e) {
+      console.warn('[store] 读取失败，使用默认值：' + key, e);
+      return fallback;
+    }
+  },
+  set(key, value) {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (e) {
+      console.warn('[store] 写入失败：' + key, e);
+      return false;
+    }
+  },
+  del(key) {
+    try { window.localStorage.removeItem(key); } catch (e) { console.warn('[store] 删除失败', e); }
+  }
+};
+
+const KEY_PROGRESS = 'xh_progress_v1';
+const KEY_NOTES = 'xh_notes_v1';
+const KEY_PICK = 'xh_pick_v1';
+const KEY_POMO = 'xh_pomo_v1';
+
+let toastTimer = 0;
+function toast(msg) {
+  const el = $('toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(function () { el.classList.remove('show'); }, 2200);
+}
+
+/* ============================================================
+   C. 章节检索 searchSections()
+   顺序：精确全等 → 别名全等 → 互相包含 → 别名包含 → 字符重合度兜底
+   ============================================================ */
+function searchSections(query) {
+  const q = norm(query);
+  if (!q) return null;
+  const keys = Object.keys(CHAPTERS);
+
+  let key = keys.find(function (k) { return norm(k) === q; }) || null;
+
+  if (!key) {
+    key = keys.find(function (k) {
+      return (ALIASES[k] || []).some(function (a) { return norm(a) === q; });
+    }) || null;
+  }
+
+  if (!key) {
+    key = keys.find(function (k) {
+      const nk = norm(k);
+      return nk.indexOf(q) !== -1 || q.indexOf(nk) !== -1;
+    }) || null;
+  }
+
+  if (!key) {
+    key = keys.find(function (k) {
+      return (ALIASES[k] || []).some(function (a) {
+        const na = norm(a);
+        return na.indexOf(q) !== -1 || q.indexOf(na) !== -1;
+      });
+    }) || null;
+  }
+
+  if (!key) {
+    const scored = fuzzyRank(q);
+    if (scored.length && scored[0].score >= 2) key = scored[0].key;
+  }
+
+  if (!key) return null;
+  return { key: key, data: CHAPTERS[key], exact: norm(key) === q };
+}
+
+/** 字符重合度排序，用于“没查到但想给个近似建议” */
+function fuzzyRank(q) {
+  const qChars = Array.from(new Set(q.split('')));
+  return Object.keys(CHAPTERS).map(function (k) {
+    const hay = norm(k) + ' ' + (ALIASES[k] || []).map(norm).join(' ');
+    let score = 0;
+    qChars.forEach(function (ch) { if (hay.indexOf(ch) !== -1) score += 1; });
+    return { key: k, score: score };
+  }).sort(function (a, b) { return b.score - a.score; });
+}
+
+/* ============================================================
+   D. 全局状态
+   ============================================================ */
+const state = {
+  bookKey: null,        // 当前书名（CHAPTERS 的 key）
+  bookData: null,       // { info, suggest, note, list }
+  selected: new Set(),  // 勾选状态：一定要用 Set，不许用数组存下标
+  dailyMin: 60,
+  plan: null,
+  filter: 'all',
+  notes: [],
+  quiz: false,
+  pomo: { mode: 'focus', left: 1500, timer: 0, running: false, cycle: 0 }
+};
+
+/* ============================================================
+   E. 章节弹框
+   ============================================================ */
+function openChapterPicker() {
+  const raw = $('inputSubject').value.trim();
+  if (!raw) {
+    showErr('startErr', '先输入书名或科目，再点查章节。');
+    $('inputSubject').focus();
+    return;
+  }
+  showErr('startErr', '');
+
+  const hit = searchSections(raw);
+  if (!hit) {
+    const top = fuzzyRank(norm(raw)).slice(0, 3).map(function (x) { return x.key; });
+    showErr('startErr', '内置书目里没有“' + raw + '”。' + (top.length ? '你是不是要找：' + top.join(' / ') : '可以点下方内置书目试一本。'));
+    return;
+  }
+
+  // 换书 → 勾选清空，默认全不选，只高亮建议章节
+  state.bookKey = hit.key;
+  state.bookData = hit.data;
+  state.selected = new Set();
+
+  $('modalBook').textContent = '《' + hit.key + '》 · 共 ' + hit.data.list.length + ' 章';
+  $('modalInfo').innerHTML =
+    '<b>简介：</b>' + esc(hit.data.info) +
+    '<br><b>建议：</b>' + esc(hit.data.note) +
+    '<br><b>高亮行 = 建议先学的章节（' + hit.data.suggest.length + ' 章），默认全部不勾选，你自己决定。';
+  $('modalTitle').textContent = '章节目录 · 勾选要学的部分';
+
+  renderChapterList();
+  $('chapterModal').hidden = false;
+  // 焦点放到弹框本体而不是关闭按钮，避免按钮上出现一圈程序化 focus 的描边
+  $('modalBox').focus();
+}
+
+function renderChapterList() {
+  const data = state.bookData;
+  const list = (data && data.list) || [];
+  const suggest = (data && data.suggest) || [];
+  if (!list.length) {
+    $('modalList').innerHTML = '<div class="chk-empty">这本书还没有章节数据。</div>';
+    updateModalCount();
+    return;
+  }
+  $('modalList').innerHTML = list.map(function (sec) {
+    const isSug = suggest.indexOf(sec.n) !== -1;
+    const checked = state.selected.has(sec.n) ? ' checked' : '';
+    return '<label class="chk' + (isSug ? ' sug' : '') + '">' +
+      '<input type="checkbox" data-n="' + sec.n + '"' + checked + '>' +
+      '<span class="chk-body">' +
+        '<span class="chk-n">第 ' + sec.n + ' 章</span>' +
+        '<span class="chk-t">' + esc(sec.title) + '</span>' +
+        (isSug ? ' <span class="pill pill-amber">建议</span>' : '') +
+        '<span class="chk-d">' + esc(sec.desc) + '</span>' +
+      '</span>' +
+    '</label>';
+  }).join('');
+  updateModalCount();
+}
+
+function updateModalCount() {
+  const total = (state.bookData && state.bookData.list.length) || 0;
+  $('modalCount').innerHTML = '已选 <b>' + state.selected.size + '</b> 章 / 共 ' + total + ' 章';
+  $('startSelectedCount').textContent = String(state.selected.size);
+  if (state.selected.size > 0) {
+    $('startSelectedBook').textContent = '已选 《' + (state.bookKey || '') + '》';
+  } else if (state.bookKey) {
+    $('startSelectedBook').textContent = '《' + state.bookKey + '》 还没勾章节';
+  }
+}
+
+function closeChapterPicker() {
+  $('chapterModal').hidden = true;
+  $('inputSubject').focus();
+}
+
+/* 把 Set 里的章节号变成有序的章节对象数组 */
+function pickedChapters() {
+  const list = (state.bookData && state.bookData.list) || [];
+  return list.filter(function (sec) { return state.selected.has(sec.n); })
+             .sort(function (a, b) { return a.n - b.n; });
+}
+
+/** 只选建议章节 */
+function selectSuggested() {
+  const suggest = (state.bookData && state.bookData.suggest) || [];
+  suggest.forEach(function (n) { state.selected.add(n); });
+  syncChecks();
+  toast('已勾选建议的 ' + suggest.length + ' 章');
+}
+
+/** 全不选 */
+function clearAllChecks() {
+  state.selected = new Set();
+  syncChecks();
+}
+
+/** 把 Set 回写到 checkbox（唯一的数据源始终是 Set） */
+function syncChecks() {
+  const boxes = $('modalList').querySelectorAll('input[type="checkbox"]');
+  Array.prototype.forEach.call(boxes, function (cb) {
+    cb.checked = state.selected.has(Number(cb.dataset.n));
+  });
+  updateModalCount();
+}
+
+/* ============================================================
+   F. 起始页 → 生成
+   ============================================================ */
+function showErr(id, msg) {
+  const el = $(id);
+  if (!el) return;
+  if (!msg) { el.hidden = true; el.textContent = ''; return; }
+  el.hidden = false;
+  el.textContent = msg;
+}
+
+function generatePlan(fromModal) {
+  const raw = $('inputSubject').value.trim();
+
+  if (!state.bookKey || norm(raw) !== norm(state.bookKey)) {
+    const hit = searchSections(raw);
+    if (hit) { state.bookKey = hit.key; state.bookData = hit.data; }
+  }
+
+  if (!state.bookKey || !state.bookData) {
+    showErr('startErr', '请先查章节：输入书名，点“🔍 查章节”。');
+    return;
+  }
+
+  let chapters = pickedChapters();
+
+  // 一章都没勾 → 用建议章节兜底，并明确告诉用户
+  if (!chapters.length) {
+    const suggest = state.bookData.suggest || [];
+    chapters = state.bookData.list.filter(function (sec) { return suggest.indexOf(sec.n) !== -1; });
+    if (chapters.length) {
+      toast('没勾章节，已按建议章节生成（' + chapters.length + ' 章）');
+    }
+  }
+
+  const dailyMin = Number($('selDailyMin').value) || 60;
+  state.dailyMin = dailyMin;
+
+  const plan = buildPlan(state.bookKey, chapters.length, dailyMin, chapters);
+  state.plan = plan;
+
+  store.set(KEY_PICK, { key: state.bookKey, selected: chapters.map(function (s) { return s.n; }), dailyMin: dailyMin });
+
+  showErr('startErr', '');
+  if (fromModal) closeChapterPicker();
+  renderPlan();
+  showPlanView();
+  switchTab('plan');
+
+  console.log('[学习闭环] buildPlan 结果：', plan);
+  if (plan.overflow > 0) {
+    toast('还有 ' + plan.overflow + ' 章排不进 31 天，建议调大每天投入或分两轮学');
+  }
+}
+
+function showPlanView() {
+  $('startView').hidden = true;
+  $('planView').hidden = false;
+}
+
+function showStartView() {
+  $('planView').hidden = true;
+  $('startView').hidden = false;
+  if (state.bookKey) {
+    $('inputSubject').value = state.bookKey;
+    updateModalCount();
+  }
+}
+
+/* ============================================================
+   G. 规则表 RULES
+   ------------------------------------------------------------------
+   31 天 = Day 0 ~ Day 30。6 个检索节点（0/1/3/7/14/30）固定存在，
+   节点日优先级高于学新内容：Day 1/3/7/14/30 是纯检索日，不排新章节。
+   ============================================================ */
+const RULES = {
+  totalDays: 31,          // Day 0 ~ Day 30
+  perSectionMin: 50,      // 一节完整走一遍六步 ≈ 50 分钟
+  maxPerDay: 3,           // 一天最多啃 3 节，再多就是自欺欺人
+
+  nodes: [
+    {
+      day: 0,
+      idx: '第0次',
+      title: '第0次检索 · 当天闭卷默框架',
+      allowStudy: true,     // 第 0 天既学新内容，也当场做第 0 次检索
+      tasks: [
+        { t: '带问题进场', min: 3, d: '扫目录和小标题，先立 3 个问题：讲什么 / 为什么学 / 和上一节什么关系', out: '脑子里一个空架子' },
+        { t: '只记关键词 · 学新内容', min: 25, d: '按信息类型记：概念写核心词、过程写步骤序号、对比写左右两列；手机扔远', out: '一页关键词笔记' },
+        { t: '闭卷默框架（第0次检索）', min: 10, d: '合上书，凭记忆画骨架：有哪几块、每块讲什么、块与块怎么连', out: '一张手写骨架图' },
+        { t: '翻书对比', min: 5, d: '漏的标红、记错的标红、完全想不起来的标三角', out: '有红有三角的骨架图' },
+        { t: '三句话定位', min: 10, d: '每个红/三角点写：一句定义 + 一句区别 + 一句例子，当天解决，不许过夜', out: '模糊点全部补全' }
+      ],
+      tip: '今天这次闭卷默框架就是第 0 次检索。整章检索 ≠ 逐字复述笔记，重建骨架和关键点，10—15 分钟就够。'
+    },
+    {
+      day: 1,
+      idx: '第1次',
+      title: '第1次检索 · 整章重默（不许只挑红点）',
+      allowStudy: false,
+      tasks: [
+        { t: '闭卷整章重默', min: 15, d: '换一张新纸、换一种形式：昨天画树状图，今天画流程图；还是那几节，每节讲什么、节与节怎么连', out: '第二张骨架图' },
+        { t: '翻书对比', min: 5, d: '对照昨天和今天的骨架图，看哪里塌了', out: '标出“过夜后忘掉的地方”' },
+        { t: '轻混 1—2 题', min: 5, d: '从旧章抽一个小节，做“新学的 A 和旧章的 B 有什么区别”的判断', out: '1 道新旧对比题' },
+        { t: '补漏', min: 10, d: '把今天塌掉的地方用红笔补进笔记', out: '笔记更新' }
+      ],
+      tip: '整章重默，不许只挑红点。昨天已经补完整了，今天是验证过夜后还剩多少，不是只补昨天漏的那几处。'
+    },
+    {
+      day: 3,
+      idx: '第2次',
+      title: '第2次检索 · 正式开始穿插',
+      allowStudy: false,
+      tasks: [
+        { t: '闭卷骨架', min: 10, d: '最近这一组内容整组骨架，只写关键词，不写长句', out: '一张精简版骨架' },
+        { t: '穿插练', min: 15, d: '本章 + 上一章各抽 2 题，每题先写判据：“这题考哪个知识点？为什么用这个不用那个？”', out: '4 道题，每题有判据' },
+        { t: '换题型', min: 5, d: '同一道题换个问法：计算题改简答，选择题改判断', out: '同一知识点的两种问法' },
+        { t: '补漏', min: 10, d: '把判据写不出来的地方记到薄弱点清单', out: '薄弱点清单 +1 行' }
+      ],
+      tip: '混的是片段和题，不是整章重过。另外：别死等第 3 天，内容成型（能独立做对、能讲出来）就可以开始混。'
+    },
+    {
+      day: 7,
+      idx: '第3次',
+      title: '第3次检索 · 单元级混合',
+      allowStudy: false,
+      tasks: [
+        { t: '抽签 3—5 章', min: 3, d: '从已经学过的章节里随机抽，抽到哪几章今天就默哪几章', out: '今天的 3—5 个目标' },
+        { t: '每章闭卷默骨架', min: 5, d: '每章只默骨架，不展开细节', out: '3—5 张骨架图' },
+        { t: '穿插练', min: 15, d: '把抽到的几章的题混在一起做，每题先归类：“这题属于哪章？考什么？”', out: '混编练习题一组' },
+        { t: '换形态', min: 5, d: '挑一道题改成给别人讲一遍（讲给空气听）', out: '口头讲一遍' },
+        { t: '补漏', min: 10, d: '薄弱点清单更新', out: '清单更新' }
+      ],
+      tip: '单元级混合：覆盖面比前面宽，具体章节更随机。穿插练的是“选哪招”，多样化练的是“认得出”。'
+    },
+    {
+      day: 14,
+      idx: '第4次',
+      title: '第4次检索 · 跨单元全混合',
+      allowStudy: false,
+      tasks: [
+        { t: '跨单元随机抽', min: 5, d: '从不同单元里各抽 1—2 章，不要集中在同一块', out: '覆盖多个单元的复习范围' },
+        { t: '闭卷整章默', min: 15, d: '抽到哪章就整章默骨架，不挑红点', out: '完整骨架图' },
+        { t: '全混合练习', min: 15, d: '所有学过的内容混着练，不分类，看能不能一眼认出“这题考什么”', out: '混合练习' },
+        { t: '薄弱点清单复盘', min: 10, d: '看清单上哪些还没划掉，重点补', out: '清单清零一部分' }
+      ],
+      tip: '旧章节不要每次全量重来，按“单章 → 单元 → 全书”三层抽样，越往后覆盖面越宽、具体章节越随机，否则到第 20 章会被压垮。'
+    },
+    {
+      day: 30,
+      idx: '第5次',
+      title: '第5次检索 · 全书随机抽 3 章',
+      allowStudy: false,
+      tasks: [
+        { t: '抽签抽 3 章', min: 3, d: '从整本书所有章节里随机抽 3 章', out: '今天的 3 个目标' },
+        { t: '抽到就整章默', min: 15, d: '抽到哪章就闭卷整章默骨架', out: '3 张完整骨架图' },
+        { t: '全混合 + 判据', min: 15, d: '3 章的题混在一起做，每题写判据', out: '混合练习 + 判据' },
+        { t: '最后复盘', min: 10, d: '看薄弱点清单，全部划掉的，就是你真正掌握的', out: '清单全清' }
+      ],
+      tip: '第 30 天是照镜子，不是再学一遍。清单全清 = 这一个月没白跑。'
+    }
+  ],
+
+  phases: [
+    { from: 0, to: 2, label: '启动期 · 纯集中练习' },
+    { from: 3, to: 6, label: '穿插启动期' },
+    { from: 7, to: 13, label: '单元级混合' },
+    { from: 14, to: 29, label: '跨单元全混合' },
+    { from: 30, to: 30, label: '全书抽检' }
+  ]
+};
+
+function phaseOf(day) {
+  for (let i = 0; i < RULES.phases.length; i++) {
+    const p = RULES.phases[i];
+    if (day >= p.from && day <= p.to) return p.label;
+  }
+  return '';
+}
+
+function nodeRuleOf(day) {
+  for (let i = 0; i < RULES.nodes.length; i++) {
+    if (RULES.nodes[i].day === day) return RULES.nodes[i];
+  }
+  return null;
+}
+
+/** 某一天能不能排新章节：节点日默认不能，除非规则里 allowStudy */
+function canStudyOn(day) {
+  const rule = nodeRuleOf(day);
+  if (!rule) return true;
+  return rule.allowStudy === true;
+}
+
+/* 学新内容日的任务模板（节点日不用这套，直接用规则里写死的） */
+function studyTasks(sections, canMix) {
+  const howMany = Math.max(1, sections.length);
+  const list = [
+    { t: '带问题进场', min: 3, d: '扫这一节的小标题，先立 3 个问题：讲什么 / 为什么学 / 和上一节什么关系', out: '脑子里一个空架子' },
+    { t: '只记关键词 · 学新内容 ×' + howMany, min: 25 * howMany, d: '按信息类型记：概念写核心词、过程写步骤序号、对比写左右两列', out: '每节一页关键词笔记' },
+    { t: '闭卷默框架 ×' + howMany, min: 10 * howMany, d: '合上书凭记忆画骨架，画完再翻书对比，漏的标红、想不起来的标三角', out: '每节一张骨架图' },
+    { t: '三句话补漏 ×' + howMany, min: 10 * howMany, d: '每个红/三角点写：一句定义 + 一句区别 + 一句例子，当天解决', out: '模糊点补全' }
+  ];
+  if (canMix) {
+    list.push({ t: '轻混 1 题', min: 5, d: '抽旧章一个小节，做“A 和 B 怎么区分”的判断，只混片段不整章重来', out: '新旧对比判据' });
+  }
+  return list;
+}
+
+/* 确定性抽样：同一个计划每次打开抽到的章节一致，方便照做 */
+function seededPick(list, count, salt) {
+  const pool = list.slice();
+  const out = [];
+  let seed = 20260301 + (salt || 0) * 7919;
+  let guard = 0;
+  while (out.length < count && pool.length && guard < 500) {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    const idx = seed % pool.length;
+    out.push(pool[idx]);
+    pool.splice(idx, 1);
+    guard += 1;
+  }
+  return out;
+}
+
+/* 章节用完之后的“机动日”：不空转，按 回炉 / 混合 / 拓展 三种轮着来 */
+function flexTasks(day, studied, canMix) {
+  const pick = seededPick(studied, Math.min(2, studied.length), day);
+
+  if (day % 3 === 0) {
+    return {
+      tag: '回炉日',
+      tip: '回炉日：不学新内容，把学过的整章重新闭卷默一遍，先默后补。',
+      tasks: [
+        { t: '回炉 ' + (pick.length ? briefOf(pick) : '（暂无已学章节）'), min: 15, d: '抽到就整章闭卷默骨架，不挑红点，画完再翻书对比', out: pick.length ? '整章骨架图 ×' + pick.length : '—' },
+        { t: '补漏', min: 10, d: '把回炉时塌掉的地方补进笔记和薄弱点清单', out: '清单更新' }
+      ]
+    };
+  }
+
+  if (day % 3 === 1) {
+    return {
+      tag: '混合日',
+      tip: '混合日：练“认得出、选对招”，不是重新学一遍。',
+      tasks: [
+        { t: '混编练习', min: 20, d: '从不同单元各抽 1—2 题混着做，每题先归类：“这题属于哪章？考什么？”', out: '一组混合题 + 每题 1 条判据' },
+        { t: '换题型', min: 8, d: '把其中一道题换个问法（选择改判断、计算改简答）', out: '同一知识点的两种问法' },
+        { t: '补漏', min: 7, d: '判据写不出来的记进薄弱点清单', out: '清单 +1 行' }
+      ]
+    };
+  }
+
+  return {
+    tag: '拓展日',
+    tip: '拓展日：把点织成网，能举生活例子、能和已会的做对比，才算真懂。',
+    tasks: [
+      { t: '讲一遍', min: 12, d: '挑一个已学会的章节，假设讲给完全不懂的人听，卡壳处就是没懂的地方', out: '口头讲一遍' },
+      { t: '三方向拓展', min: 15, d: '深度（来龙去脉）/ 横向（相似项）/ 纵向（跨领域用）各写一条', out: '三条拓展' },
+      { t: '整理笔记', min: 8, d: '把拓展写进笔记，自测栏只写问题不写答案', out: '笔记变题库' }
+    ]
+  };
+}
+
+function briefOf(list) {
+  return list.map(function (s) { return '第' + s.n + '节'; }).join('、');
+}
+
+/* ============================================================
+   H. 计划引擎 buildPlan(subject, totalSections, dailyMin, sections)
+   ------------------------------------------------------------------
+   铁律：章节切片只有一个出处 —— grabSections() 里的那个游标 cursor。
+   pulse（节点日）与 study（学新内容）都只能从这里拿章节，
+   节点日的检索范围只“读”已经学过的章节，绝不动游标，所以不会重复。
+   顺序固定：先判断 pulse，再判断 study。
+   ============================================================ */
+function buildPlan(subject, totalSections, dailyMin, sections) {
+  const pool = (Array.isArray(sections) ? sections : [])
+    .filter(function (s) { return s && typeof s.n === 'number' && typeof s.title === 'string'; })
+    .map(function (s) { return { n: s.n, title: s.title, desc: s.desc || '' }; });
+
+  const studyDayCount = [];
+  for (let d = 0; d < RULES.totalDays; d++) if (canStudyOn(d)) studyDayCount.push(d);
+
+  // 每天要啃几节：既要装得下整本书，又不能超过脑力上限
+  const need = pool.length ? Math.ceil(pool.length / studyDayCount.length) : 1;
+  const perDay = Math.max(1, Math.min(Math.max(need, 1), RULES.maxPerDay));
+
+  let warn = null;
+  const budget = dailyMin - 10;
+  const fitByTime = Math.floor(budget / RULES.perSectionMin);
+  if (perDay > Math.max(fitByTime, 1)) {
+    warn = '按每天 ' + dailyMin + ' 分钟，一天排 ' + perDay + ' 节偏紧（一节完整走完六步约 ' + RULES.perSectionMin + ' 分钟）。' +
+           '建议把每天投入调到 ' + (perDay * RULES.perSectionMin + 15) + ' 分钟以上，或者少勾几章。';
+  }
+
+  let cursor = 0;
+  const studied = [];
+
+  /** 唯一的章节游标：pulse 与 study 都不得自己算区间 */
+  function grabSections(count) {
+    if (count <= 0 || cursor >= pool.length) return [];
+    const take = Math.min(count, pool.length - cursor);
+    const out = pool.slice(cursor, cursor + take);
+    cursor += take;
+    for (let i = 0; i < out.length; i++) studied.push(out[i]);
+    return out;
+  }
+
+  /** 节点日的检索范围：只读 studied，不推进游标 */
+  function resolveNodeRange(rule, todayStudy) {
+    const recent = studied.slice(-perDay);
+    const recentTwo = studied.slice(-perDay * 2);
+    const items = [];
+    let text = '';
+
+    if (rule.day === 0) {
+      items.push.apply(items, todayStudy.length ? todayStudy : recent);
+      text = todayStudy.length
+        ? '范围：今天刚学的 ' + briefOf(todayStudy) + '，趁热打铁整章默。'
+        : '范围：今天的章节（今天没有排新内容，先补前一天）。';
+    } else if (rule.day === 1) {
+      items.push.apply(items, recent);
+      text = '范围：最近学的 ' + briefOf(items) + '，整章闭卷重默，换一种图形再画一遍。';
+    } else if (rule.day === 3) {
+      items.push.apply(items, recentTwo);
+      text = items.length
+        ? '范围：' + briefOf(items) + '（最近一组 + 上一组），两两互相比着做题，每题先写判据。'
+        : '范围：已学内容还不够两组，先按最近学的做。';
+    } else if (rule.day === 7) {
+      const pick = seededPick(studied, Math.min(4, studied.length), 3);
+      items.push.apply(items, pick);
+      text = '范围：从已学的 ' + studied.length + ' 节里随机抽 ' + items.length + ' 节（' + briefOf(items) + '），单元级混合。';
+    } else if (rule.day === 14) {
+      const third = Math.max(1, Math.floor(studied.length / 3));
+      const seg1 = studied.slice(0, third);
+      const seg2 = studied.slice(third, third * 2);
+      const seg3 = studied.slice(third * 2);
+      [seg1, seg2, seg3].forEach(function (seg, i) {
+        const pick = seededPick(seg, Math.min(2, seg.length), 10 + i);
+        items.push.apply(items, pick);
+      });
+      text = '范围：跨单元抽样 ' + items.length + ' 节（' + briefOf(items) + '），不同单元各抽一点，全混合。';
+    } else if (rule.day === 30) {
+      const pick = seededPick(pool, Math.min(3, pool.length), 30);
+      items.push.apply(items, pick);
+      text = '范围：全书随机抽 ' + items.length + ' 节（' + briefOf(items) + '），抽到就整章默。';
+    }
+
+    // 去重，避免同一节在一张卡里出现两次
+    const uniq = [];
+    items.forEach(function (s) {
+      if (!uniq.some(function (x) { return x.n === s.n; })) uniq.push(s);
+    });
+    return { items: uniq, text: text };
+  }
+
+  const days = [];
+  let studyIdx = 0;   // 学习日序号，仅用于“把章节均分到各学习日”，不参与切片
+
+  for (let d = 0; d < RULES.totalDays; d++) {
+    const rule = nodeRuleOf(d);
+    const day = {
+      day: d,
+      isNode: !!rule,
+      node: null,
+      study: [],
+      tasks: [],
+      tip: '',
+      phase: phaseOf(d),
+      minutes: 0,
+      isFlex: false
+    };
+
+    // ① 先判断 pulse：节点日先把检索节点占住，谁也挤不掉
+    if (rule) {
+      day.node = {
+        idx: rule.idx,
+        title: rule.title,
+        items: [],
+        rangeText: '',
+        tasks: rule.tasks.slice()
+      };
+    }
+
+    // ② 再判断 study：只有允许学新内容的日期才发章节
+    if (!rule || rule.allowStudy) {
+      // 均分：第 i 个学习日拿 floor((i+1)*总/N) - floor(i*总/N) 节，前后均匀不堆在一头
+      let quota = Math.floor((studyIdx + 1) * pool.length / studyDayCount.length)
+                - Math.floor(studyIdx * pool.length / studyDayCount.length);
+      // Day 0 必须开张：只要还有章节，就先排 1 节，别让第一天是空壳
+      if (studyIdx === 0 && pool.length > 0) quota = Math.max(1, quota);
+      quota = Math.min(quota, pool.length - cursor);
+      studyIdx += 1;
+      day.study = grabSections(quota);
+    }
+
+    // ③ 节点日的检索范围：只读已学章节（不推进游标）
+    if (rule && day.node) {
+      const range = resolveNodeRange(rule, day.study);
+      day.node.items = range.items;
+      day.node.rangeText = range.text;
+      day.tasks = rule.tasks.slice();
+      day.tip = rule.tip;
+    } else {
+      const canMix = studied.length > day.study.length;
+      if (day.study.length === 0) {
+        day.isFlex = true;
+        const fp = flexTasks(d, studied, canMix);
+        day.flexTag = fp.tag;
+        day.tasks = fp.tasks;
+        day.tip = fp.tip;
+      } else {
+        day.tasks = studyTasks(day.study, canMix);
+        day.tip = d <= 2
+          ? '头两天以集中练习为主，混也只混“片段 + 判断题”，别整章重来。'
+          : (d < 14
+            ? '旧内容按“抽一个小节 + 写判据”混进来，抓的是区分能力，不是重学一遍。'
+            : '这个阶段可以直接全混合：从不同单元各抽一小节，先归类再做题。');
+      }
+    }
+
+    let mins = 0;
+    day.tasks.forEach(function (t) { mins += (t.min || 0); });
+    day.minutes = mins;
+
+    days.push(day);
+  }
+
+  const plan = {
+    subject: subject,
+    dailyMin: dailyMin,
+    totalSections: totalSections,
+    plannedSections: cursor,
+    sectionsPerDay: perDay,
+    studyDayCount: studyDayCount.length,
+    nodeCount: RULES.nodes.length,
+    overflow: Math.max(0, pool.length - cursor),
+    warn: warn,
+    days: days
+  };
+
+  if (pool.length !== Number(totalSections)) {
+    console.warn('[buildPlan] totalSections 与 sections 长度不一致：', totalSections, pool.length);
+  }
+  return plan;
+}
+
+/* ============================================================
+   I. 打卡进度
+   ============================================================ */
+function loadDone(subject) {
+  const all = store.get(KEY_PROGRESS, {}) || {};
+  return Array.isArray(all[subject]) ? all[subject] : [];
+}
+
+function saveDone(subject, list) {
+  const all = store.get(KEY_PROGRESS, {}) || {};
+  all[subject] = list;
+  store.set(KEY_PROGRESS, all);
+}
+
+/* ============================================================
+   J. 计划页渲染
+   ============================================================ */
+function renderPlan() {
+  const plan = state.plan;
+  if (!plan) return;
+
+  state.done = new Set(loadDone(plan.subject));
+
+  $('planSubject').textContent = plan.subject;
+  $('planSub').textContent =
+    '每天 ' + plan.dailyMin + ' 分钟 · 一天啃 ' + plan.sectionsPerDay + ' 节 · 共排 ' +
+    plan.plannedSections + ' 节，' + plan.nodeCount + ' 个检索节点固定不动';
+
+  $('metaSections').textContent = String(plan.plannedSections);
+  $('metaDaily').textContent = String(plan.dailyMin);
+  $('metaNodeDays').textContent = String(plan.nodeCount);
+  $('metaStudyDays').textContent = String(plan.studyDayCount);
+
+  const warn = $('planWarn');
+  if (plan.warn) {
+    warn.hidden = false;
+    warn.textContent = plan.warn;
+  } else if (plan.overflow > 0) {
+    warn.hidden = false;
+    warn.textContent = '还有 ' + plan.overflow + ' 节没排进 31 天：把每天投入调大，或者分两轮学。';
+  } else {
+    warn.hidden = true;
+    warn.textContent = '';
+  }
+
+  state.filter = $('selFilter').value || 'all';
+  renderDays();
+  updateProgressBar();
+}
+
+function secPill(sec) {
+  return '<span class="sec-pill" title="' + esc(sec.title) + '">' +
+           '<b>第' + sec.n + '节</b><span>' + esc(sec.title) + '</span>' +
+         '</span>';
+}
+
+function dayHtml(d) {
+  const done = state.done.has(d.day);
+  const cls = 'day' + (d.isNode ? ' node' : '') + (done ? ' done' : '');
+  const noCls = d.isNode ? 'day-no node-no' : 'day-no';
+  const tag = d.isNode
+    ? '<span class="pill pill-amber">' + esc(d.node.idx) + ' · 检索节点</span>'
+    : '<span class="pill">' + esc(d.isFlex ? (d.flexTag || '机动日') : '学新内容') + '</span>';
+
+  let rangeLine = '';
+  let pills = '';
+  if (d.isNode) {
+    rangeLine = '<div class="day-title">' + esc(d.node.title) + '</div>';
+    pills = d.node.items.length
+      ? d.node.items.map(secPill).join('')
+      : '<span class="hint">还没有已学章节可供检索</span>';
+  } else {
+    rangeLine = '<div class="day-title">' + (d.study.length
+      ? '今天学：' + esc(d.study.map(function (s) { return '第' + s.n + '节 ' + s.title; }).join(' / '))
+      : esc(d.flexTag || '机动日') + ' · 不排新章节，专门填坑织网') + '</div>';
+    pills = d.study.length ? d.study.map(secPill).join('') : '';
+  }
+
+  const tasks = d.tasks.map(function (t) {
+    return '<li><b>' + esc(t.t) + '</b>' +
+             '<span class="min">' + (t.min || 0) + '′</span>' +
+             '<span class="desc">' + esc(t.d) +
+               (t.out ? ' <span class="hint">→ ' + esc(t.out) + '</span>' : '') +
+             '</span></li>';
+  }).join('');
+
+  const rangeNote = d.isNode && d.node.rangeText
+    ? '<div class="tip">' + esc(d.node.rangeText) + '</div>'
+    : (d.tip ? '<div class="tip">' + esc(d.tip) + '</div>' : '');
+
+  return '<article class="' + cls + '" data-day="' + d.day + '">' +
+    '<div class="day-check">' +
+      '<input type="checkbox" data-day-chk="' + d.day + '"' + (done ? ' checked' : '') +
+        ' aria-label="Day ' + d.day + ' 打卡">' +
+    '</div>' +
+    '<div class="day-main">' +
+      '<div class="day-head">' +
+        '<span class="' + noCls + '">Day ' + d.day + '</span>' + tag +
+        '<span class="pill pill-green">约 ' + d.minutes + ' 分钟</span>' +
+        '<span class="day-phase">' + esc(d.phase) + '</span>' +
+      '</div>' +
+      rangeLine +
+      (pills ? '<div class="day-secs">' + pills + '</div>' : '') +
+      '<ul class="tasks">' + tasks + '</ul>' +
+      rangeNote +
+    '</div>' +
+  '</article>';
+}
+
+function renderDays() {
+  const plan = state.plan;
+  if (!plan) return;
+  const visible = plan.days.filter(function (d) {
+    if (state.filter === 'node') return d.isNode;
+    if (state.filter === 'todo') return !state.done.has(d.day);
+    return true;
+  });
+  $('planList').innerHTML = visible.length
+    ? visible.map(dayHtml).join('')
+    : '<div class="card-flat note-empty">这个筛选下没有内容。换成“全部 31 天”看看。</div>';
+  $('planCountHint').textContent = '显示 ' + visible.length + ' / ' + plan.days.length + ' 天';
+}
+
+function updateProgressBar() {
+  const plan = state.plan;
+  if (!plan) return;
+  let count = 0;
+  state.done.forEach(function (d) { if (d >= 0 && d < RULES.totalDays) count += 1; });
+  $('progressNum').textContent = String(count);
+  $('planProgressBar').style.width = Math.round(count / RULES.totalDays * 100) + '%';
+}
+
+function toggleDayDone(day, checked) {
+  const plan = state.plan;
+  if (!plan) return;
+  const list = loadDone(plan.subject);
+  const idx = list.indexOf(day);
+  if (checked && idx === -1) list.push(day);
+  if (!checked && idx !== -1) list.splice(idx, 1);
+  saveDone(plan.subject, list);
+  state.done = new Set(list);
+  updateProgressBar();
+  const card = $('planList').querySelector('[data-day="' + day + '"]');
+  if (card) card.classList.toggle('done', checked);
+}
+
+/* ============================================================
+   K. 六步学习法内容
+   ============================================================ */
+const METHOD = {
+  logic: [
+    ['1', '提取 > 输入', '《认知天性》', '看书听课划线都是输入，带来熟悉感；合上书能从脑子里拽出来，才是真学会'],
+    ['2', '合意困难才有效', '《认知天性》', '学得顺、爽、全懂的时候，往往没进长期记忆；卡一下、想一下、失败后再想起来，留存最牢'],
+    ['3', '新知识必须挂钩子', '《认知天性》+《如何高效学习》', '挂到旧知识、一个例子、一个真实问题上，否则就是孤立浮点，几小时就掉'],
+    ['4', '专注与发散必须交替', '《学习之道》', '专注像聚光灯（打一点），发散像灯笼（照一片）。卡壳了就切发散，别硬扛'],
+    ['5', '知识要成网不要成点', '《如何高效学习》', '单个知识点记不住，知识点之间连起来才记得牢：你不是在背点，是在织网']
+  ],
+  steps: [
+    {
+      no: 1, title: '带问题进场',
+      act: '带着问题去听课 / 看书，先立框架再填细节。',
+      tools: '《如何高效学习》— 先建框架再填细节',
+      how: ['花 3 分钟扫目录 / 大纲 / 标题，知道这节课大概讲哪几块', '在脑子里形成 3 个问题：这节讲什么？为什么要学？和上节课什么关系？', '带着这 3 个问题进场'],
+      key: '空架子先进场，后面的细节才有地方放。'
+    },
+    {
+      no: 2, title: '只听只记关键词',
+      act: '课上只写关键词和结构，不抄长句——抄写会占掉跟随逻辑的注意力。',
+      tools: '《学习之道》— 番茄工作法；《如何高效学习》— 区分信息类型',
+      how: [
+        '手机扔远，定时器设 25 分钟，专注听 + 记',
+        '概念类（什么是 XX）→ 写 1—2 个核心词，比如“复利 = 利滚利”',
+        '过程类（怎么做 XX）→ 写步骤序号，比如“① 读题 ② 套公式 ③ 验算”',
+        '对比类（A 和 B 有什么区别）→ 写两行，左边 A 右边 B，各写 3 个关键词',
+        '随意类（日期、人名、公式）→ 直接记，不用加工',
+        '响铃后真休息 5 分钟（站起来走动、喝水，别刷手机）'
+      ],
+      key: '手在动、逻辑丢了，是笔记最常见的失败方式。'
+    },
+    {
+      no: 3, title: '课后立刻闭卷默框架（第0次检索 · 支点）',
+      act: '刚下课 / 刚看完书，立刻合上书，凭记忆画框架。没有这一次，前后都打折。',
+      tools: '《学习之道》— 组块化；《认知天性》— 检索练习',
+      how: [
+        '凭记忆画框架：这章有哪几块？每块讲什么？块与块怎么连？为什么这么连？',
+        '画完再翻书对比：漏的标红，记错的标红，完全想不起来的标三角',
+        '整章检索 ≠ 逐字复述笔记：闭卷重建骨架和关键点，10—15 分钟就够'
+      ],
+      key: '背笔记是重复阅读，闭卷重建骨架才是检索。'
+    },
+    {
+      no: 4, title: '三句话定位模糊点',
+      act: '对每个标红 / 标三角的点，写三句话，当天解决，不许过夜。',
+      tools: '《如何高效学习》— 比喻法 + 内在化；《学习之道》— 记忆宫殿',
+      how: [
+        '一句定义：用我自己的话说，它到底是什么（复利 = 利滚利，利息也生利息）',
+        '一句区别：它和我已经会的哪个像、差在哪（和单利像，但单利只有本金生息）',
+        '一句例子：举一个我能用它解释的真实小例子（100 块年利 10%，第一年 110，第二年 121）',
+        '写不出来 → 翻书查、问人，当天解决；太抽象就上比喻法；记不住就上记忆宫殿'
+      ],
+      key: '模糊点过夜就变成窟窿，第二天补要花三倍时间。'
+    },
+    {
+      no: 5, title: '讲一遍，用自己话成笔记',
+      act: '先讲一遍（讲给空气或朋友），讲完整理笔记，做三个方向拓展。',
+      tools: '《如何高效学习》— 拓展三方向；《学习之道》— 教是最好的学',
+      how: [
+        '讲一遍：假设你在给完全没接触过这领域的人讲；讲时打结、卡壳的地方就是没懂的地方',
+        '深度拓展：这个东西的来龙去脉是什么？怎么来的？',
+        '横向拓展：还有哪些类似的？和它像的是什么？',
+        '纵向拓展：能不能跨领域用（最高级）？',
+        '笔记格式：左边写知识点框架，右边留一栏自测栏，只写问题不写答案'
+      ],
+      key: '遮住左边自问自答，笔记本身就变成你的题库。'
+    },
+    {
+      no: 6, title: '间隔检索（第0次—第5次）',
+      act: '按 0/1/3/7/14/30 天的节奏闭卷检索，越往后覆盖面越宽、具体章节越随机。',
+      tools: '《认知天性》— 穿插练习 + 多样化练习；《学习之道》— 回想比反复阅读有效',
+      how: [
+        '第0次（当天）：本章整章骨架 + 三句话定位，不混旧内容',
+        '第1次（第1天）：本章整章闭卷重默，换一种形式；可轻混 1—2 道旧章片段',
+        '第2次（第3天）：本章 + 上一章，每题写判据；正式开始穿插',
+        '第3次（第7天）：单元级 3—5 章随机混，穿插 + 换题型',
+        '第4次（第14天）：跨单元混合，全混合',
+        '第5次（第30天）：全书随机抽 3 章，抽到就整章默'
+      ],
+      key: '整章检索 ≠ 逐字复述笔记；第 1 次必须整章，不许只挑红点。'
+    }
+  ],
+  rhythm: [
+    ['当天（第0次）', '本章整章骨架 + 三句话定位（趁热打铁）', '不混'],
+    ['第1天（第1次）', '本章整章闭卷重默（换形式，必须整章，不能只挑红点）', '可轻混 1—2 道旧章片段 / 题'],
+    ['第3天（第2次）', '本章 + 上一章，每题写判据（为什么用这个不用那个）', '正式开始穿插：混片段和题，不是整章重过'],
+    ['第7天（第3次）', '单元级：3—5 章随机混', '穿插 + 换题型'],
+    ['第14天（第4次）', '跨单元混合', '全混合'],
+    ['第30天（第5次）', '全书随机抽 3 章，抽到就整章默', '全混合，按抽签']
+  ],
+  modules: [
+    {
+      title: '模块 A · 卡壳急救：切发散模式', from: '《学习之道》',
+      lines: ['做题卡住：立刻停，去散步 / 洗澡 / 运动 15 分钟', '看书看不懂：换个科目，或者干脆休息一下', '越学越烦躁：停止学习，做点别的，让后台处理'],
+      key: '判断标准：想了 15 分钟还没思路，就别想了，切发散。'
+    },
+    {
+      title: '模块 B · 信息分类：不同信息用不同学法', from: '《如何高效学习》',
+      lines: ['随意信息（日期、人名、公式、条文编号）→ 记忆宫殿、挂钩法、压缩法', '观点信息（理论、流派、看法）→ 找论据、找对立观点、找共识', '过程信息（怎么做、操作步骤）→ 动手练、模拟、做中学', '具体信息（看得见摸得着）→ 内在化（加画面、加感觉）', '抽象信息（数学、哲学、理论物理）→ 多找例子、多比喻、多挂钩'],
+      key: '先判断手里这是什么信息，再决定用什么学法。'
+    },
+    {
+      title: '模块 C · 对抗拖延：番茄工作法', from: '《学习之道》',
+      lines: ['关掉所有干扰，手机扔远', '定时器设 25 分钟，告诉自己：“就做 25 分钟，25 分钟后就停”', '开始做，响铃后真休息 5 分钟', '每 4 个番茄钟，休息 20—30 分钟'],
+      key: '拖延不是懒，是大脑把“开始”和不舒服绑定了。先坐下就赢一半。'
+    }
+  ],
+  avoid: [
+    '反复划线、反复阅读——最舒服，也最没用',
+    '边听边抄整句——手在动，逻辑丢了',
+    '照搬教材做笔记——手在动，脑没动',
+    '同一科连续突击三小时——换成两科穿插，同样时间留存更高',
+    '看着答案点头“我会了”——那是熟悉感，不是掌握',
+    '卡壳了硬扛——切发散模式，去散步洗澡，别死磕',
+    '学完就扔，不做间隔检索——当天学的当天爽，一周后全忘'
+  ],
+  chant: [
+    '带问题进场，只记关键词；',
+    '课后闭卷默，三句话补漏；',
+    '讲一遍成网，三方向拓展；',
+    '间隔闭卷检索，混着练到熟；',
+    '卡壳就切发散，难受就是生效。'
+  ],
+  chantSub: '第0次是当天那次；第1天整章不挑食；第3天起开始串门。每次闭卷：先默后补，不是先看再背。'
+};
+
+function renderMethod() {
+  const table = function (head, rows, cls) {
+    return '<div class="table-wrap"><table' + (cls ? ' class="' + cls + '"' : '') + '><thead><tr>' +
+      head.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') +
+      '</tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr>' + r.map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>';
+      }).join('') +
+      '</tbody></table></div>';
+  };
+
+  const logicRows = METHOD.logic.map(function (r) {
+    return ['<b>' + esc(r[0]) + '</b>', esc(r[1]), esc(r[2]), esc(r[3])];
+  });
+
+  const stepCards = METHOD.steps.map(function (s) {
+    return '<div class="step-card">' +
+      '<div class="step-head"><span class="step-no">' + s.no + '</span><h3>第' + s.no + '步 · ' + esc(s.title) + '</h3>' +
+        (s.no === 3 ? '<span class="pill pill-red">支点</span>' : '') +
+      '</div>' +
+      '<p class="step-tools">' + esc(s.act) + '　｜　' + esc(s.tools) + '</p>' +
+      '<ul class="step-do">' + s.how.map(function (h) { return '<li>' + esc(h) + '</li>'; }).join('') + '</ul>' +
+      '<div class="step-key">' + esc(s.key) + '</div>' +
+    '</div>';
+  }).join('');
+
+  const rhythmRows = METHOD.rhythm.map(function (r) {
+    return ['<b>' + esc(r[0]) + '</b>', esc(r[1]), esc(r[2])];
+  });
+
+  const moduleCards = METHOD.modules.map(function (m) {
+    return '<div class="step-card">' +
+      '<div class="step-head"><h3>' + esc(m.title) + '</h3><span class="pill">' + esc(m.from) + '</span></div>' +
+      '<ul class="step-do">' + m.lines.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul>' +
+      '<div class="step-key">' + esc(m.key) + '</div>' +
+    '</div>';
+  }).join('');
+
+  $('methodRoot').innerHTML =
+    '<div class="card method-hero">' +
+      '<div class="start-kicker">《认知天性》×《学习之道》×《如何高效学习》</div>' +
+      '<h2>三合一学习闭环</h2>' +
+      '<p>这套路线的分工：<b>《认知天性》</b>管巩固和记忆，<b>《学习之道》</b>管启动和专注，<b>《如何高效学习》</b>管理解和建网。</p>' +
+      '<div class="method-main">主路径：带问题进场 → 只听只记关键词 → 课后立刻闭卷默框架（第0次检索）→ 三句话定位模糊点 → 讲一遍并用自己话成笔记 → 按第0/1/3/7/14/30天闭卷检索 → 混着练、拿考试照镜子。</div>' +
+      '<p class="hint" style="margin-top:14px;">判断学会的标准：合上书 → 能用自己的话讲出来 → 能举一个生活中的例子 → 能和已经会的另一个东西做对比。四条全过，才算真懂。</p>' +
+    '</div>' +
+
+    '<div class="section-title"><h2>一、底层逻辑：五条地基</h2><span>原理一歪，动作就会退回“多看几遍”</span></div>' +
+    table(['#', '底层逻辑', '来自哪本书', '一句话解释'], logicRows) +
+
+    '<div class="section-title"><h2>二、六步闭环</h2><span>第 3 步是整条路线的支点</span></div>' +
+    stepCards +
+
+    '<div class="section-title"><h2>三、检索节奏表</h2><span>第 0 次至第 5 次，别自己乱加次数</span></div>' +
+    table(['时点', '检索什么', '混不混旧内容'], rhythmRows) +
+    '<div class="step-card" style="margin-top:12px;">' +
+      '<p class="step-tools">四条关键提醒</p>' +
+      '<ul class="step-do">' +
+        '<li>整章检索 ≠ 逐字复述笔记：闭卷重建骨架和关键点，10—15 分钟。</li>' +
+        '<li>第 1 次必须整章重默，不许只挑红点。前一天已补完整，后面按完整脉络走，不再从头重学。</li>' +
+        '<li>别死等第 3 天。真正的触发条件是内容成型（能独立做对、能讲出来）；混的时候混片段和题，不是旧章整章重来。</li>' +
+        '<li>旧章节不能每次全量重来，按层级抽样：单章 → 单元 → 全书，越往后覆盖面越宽、具体章节越随机。</li>' +
+      '</ul>' +
+      '<div class="step-key">穿插练“选哪招”，多样化练“认得出”。先用集中练习练到“会”，再用穿插练到“熟”，顺序不能反。判断标准：换外衣，不换原理。</div>' +
+    '</div>' +
+
+    '<div class="section-title"><h2>四、补充模块</h2><span>卡壳、分类、拖延，三个高频场景</span></div>' +
+    moduleCards +
+
+    '<div class="section-title"><h2>五、必须戒掉的七个动作</h2><span>戒不掉这些，方法再好也白搭</span></div>' +
+    '<div class="avoid-list">' +
+      METHOD.avoid.map(function (a, i) {
+        return '<div class="avoid-item"><span>' + (i + 1) + '.</span><span>' + esc(a) + '</span></div>';
+      }).join('') +
+    '</div>' +
+
+    '<div class="section-title"><h2>六、一句话口诀</h2><span>记不住整套体系，就记这几句</span></div>' +
+    '<div class="chant">' + METHOD.chant.map(esc).join('<br>') +
+      '<small>' + esc(METHOD.chantSub) + '</small></div>';
+}
+
+/* ============================================================
+   L. 页签切换
+   ============================================================ */
+const TAB_MAP = {
+  plan: { tab: 'tabPlan', panel: 'panelPlan' },
+  method: { tab: 'tabMethod', panel: 'panelMethod' },
+  pomodoro: { tab: 'tabPomodoro', panel: 'panelPomodoro' },
+  notes: { tab: 'tabNotes', panel: 'panelNotes' }
+};
+
+function switchTab(name) {
+  const target = TAB_MAP[name] || TAB_MAP.plan;
+  Object.keys(TAB_MAP).forEach(function (k) {
+    const t = $(TAB_MAP[k].tab);
+    const p = $(TAB_MAP[k].panel);
+    if (!t || !p) return;
+    const on = k === name;
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+    p.hidden = !on;
+  });
+  if (target) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ============================================================
+   M. 番茄钟
+   ============================================================ */
+const POMO_MODES = {
+  focus: { label: '专注', sec: 25 * 60, next: 'short' },
+  short: { label: '短休息', sec: 5 * 60, next: 'focus' },
+  long: { label: '长休息', sec: 20 * 60, next: 'focus' }
+};
+
+function pomoTodayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+}
+
+function pomoLoad() {
+  const saved = store.get(KEY_POMO, {}) || {};
+  const today = pomoTodayStr();
+  state.pomo.todayCount = saved.date === today ? (saved.today || 0) : 0;
+  state.pomo.totalCount = saved.total || 0;
+}
+
+function pomoSave() {
+  store.set(KEY_POMO, { date: pomoTodayStr(), today: state.pomo.todayCount || 0, total: state.pomo.totalCount || 0 });
+}
+
+function pomoFmt(sec) {
+  const s = Math.max(0, Math.round(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r;
+}
+
+function pomoRender() {
+  const p = state.pomo;
+  $('pomoClock').textContent = pomoFmt(p.left);
+  $('pomoClock').classList.toggle('running', !!p.running);
+  $('btnPomoStart').textContent = p.running ? '暂停' : (p.left === POMO_MODES[p.mode].sec ? '开始' : '继续');
+  $('pomoState').textContent = p.running
+    ? ('正在进行：' + POMO_MODES[p.mode].label + (p.mode === 'focus' ? '（手机扔远，只做一件事）' : '（站起来走两步，别刷手机）'))
+    : (p.left === POMO_MODES[p.mode].sec ? '先骗自己坐下来，坐下来就赢了一半' : '已暂停，随时可以继续');
+
+  Object.keys(POMO_MODES).forEach(function (k) {
+    const btn = $(k === 'focus' ? 'pomoModeFocus' : (k === 'short' ? 'pomoModeShort' : 'pomoModeLong'));
+    if (btn) btn.setAttribute('aria-pressed', p.mode === k ? 'true' : 'false');
+  });
+
+  const dots = $('pomoDots');
+  const filled = (p.cycle || 0) % 4;
+  dots.innerHTML = [0, 1, 2, 3].map(function (i) {
+    return '<span class="pomo-dot' + (i < filled ? ' on' : '') + '"></span>';
+  }).join('');
+
+  $('pomoToday').textContent = String(p.todayCount || 0);
+  $('pomoTotal').textContent = String(p.totalCount || 0);
+  $('pomoCycle').textContent = String(filled);
+}
+
+function pomoSetMode(mode) {
+  if (!POMO_MODES[mode]) return;
+  pomoStopTimer();
+  state.pomo.mode = mode;
+  state.pomo.left = POMO_MODES[mode].sec;
+  state.pomo.running = false;
+  state.pomo.endAt = 0;
+  pomoRender();
+}
+
+function pomoStopTimer() {
+  if (state.pomo.timer) {
+    window.clearInterval(state.pomo.timer);
+    state.pomo.timer = 0;
+  }
+}
+
+function pomoStartPause() {
+  const p = state.pomo;
+  if (p.running) {
+    p.left = Math.max(0, Math.round((p.endAt - Date.now()) / 1000));
+    p.running = false;
+    p.endAt = 0;
+    pomoStopTimer();
+    pomoRender();
+    return;
+  }
+  p.running = true;
+  p.endAt = Date.now() + p.left * 1000;
+  pomoStopTimer();
+  p.timer = window.setInterval(function () {
+    const left = Math.round((state.pomo.endAt - Date.now()) / 1000);
+    state.pomo.left = Math.max(0, left);
+    if (left <= 0) pomoFinish();
+    else pomoRender();
+  }, 250);
+  pomoRender();
+}
+
+function pomoFinish() {
+  const p = state.pomo;
+  pomoStopTimer();
+  p.running = false;
+  p.endAt = 0;
+  p.left = 0;
+  pomoRender();
+  beep(p.mode === 'focus' ? 3 : 2);
+
+  if (p.mode === 'focus') {
+    p.todayCount = (p.todayCount || 0) + 1;
+    p.totalCount = (p.totalCount || 0) + 1;
+    p.cycle = (p.cycle || 0) + 1;
+    pomoSave();
+    const next = (p.cycle % 4 === 0) ? 'long' : 'short';
+    toast('番茄完成，共 ' + p.totalCount + ' 个。' + (next === 'long' ? '进长休息 20 分钟。' : '休息 5 分钟。'));
+    pomoSetMode(next);
+  } else {
+    toast('休息结束，回来做下一个 25 分钟。');
+    pomoSetMode('focus');
+  }
+}
+
+function pomoReset() {
+  pomoStopTimer();
+  state.pomo.running = false;
+  state.pomo.endAt = 0;
+  state.pomo.left = POMO_MODES[state.pomo.mode].sec;
+  pomoRender();
+}
+
+function pomoSkip() {
+  const p = state.pomo;
+  pomoStopTimer();
+  p.running = false;
+  p.endAt = 0;
+  if (p.mode === 'focus') {
+    p.cycle = (p.cycle || 0) + 1;
+    pomoSave();
+    pomoSetMode((p.cycle % 4 === 0) ? 'long' : 'short');
+  } else {
+    pomoSetMode('focus');
+  }
+  toast('已跳过这一段');
+}
+
+/** 响铃：浏览器禁止自动播放，只有用户点过按钮后才允许（这里必然由点击触发） */
+function beep(times) {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const ctx = new AC();
+    for (let i = 0; i < times; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880 + i * 60;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const at = ctx.currentTime + i * 0.55;
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(0.3, at + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.45);
+      osc.start(at);
+      osc.stop(at + 0.5);
+    }
+    window.setTimeout(function () { try { ctx.close(); } catch (e) {} }, 2000);
+  } catch (e) {
+    console.warn('[beep] 播放失败', e);
+  }
+}
+
+/* ============================================================
+   N. 知识点总结
+   ============================================================ */
+function loadNotes() {
+  state.notes = store.get(KEY_NOTES, []) || [];
+  if (!Array.isArray(state.notes)) state.notes = [];
+}
+
+function saveNotes() {
+  store.set(KEY_NOTES, state.notes);
+}
+
+function addNote() {
+  const title = $('noteTitle').value.trim();
+  if (!title) {
+    showErr('noteErr', '先写知识点名称。');
+    $('noteTitle').focus();
+    return;
+  }
+  showErr('noteErr', '');
+  const note = {
+    id: 'n' + Date.now(),
+    title: title,
+    def: $('noteDef').value.trim(),
+    diff: $('noteDiff').value.trim(),
+    ex: $('noteEx').value.trim(),
+    deep: $('noteDeep').value.trim(),
+    wide: $('noteWide').value.trim(),
+    vertical: $('noteVertical').value.trim(),
+    date: pomoTodayStr()
+  };
+  state.notes.unshift(note);
+  saveNotes();
+  renderNotes();
+  ['noteTitle', 'noteDef', 'noteDiff', 'noteEx', 'noteDeep', 'noteWide', 'noteVertical'].forEach(function (id) {
+    $(id).value = '';
+  });
+  $('noteTitle').focus();
+  toast('已保存：' + title);
+}
+
+function renderNotes() {
+  const q = norm($('noteSearch').value);
+  const list = state.notes.filter(function (n) {
+    if (!q) return true;
+    return norm(n.title + ' ' + n.def + ' ' + n.diff + ' ' + n.ex).indexOf(q) !== -1;
+  });
+  $('noteCount').textContent = state.notes.length + ' 条';
+  $('noteList').className = state.quiz ? 'quiz' : '';
+
+  if (!list.length) {
+    $('noteList').innerHTML = '<div class="card-flat note-empty">' +
+      (state.notes.length ? '没有匹配的知识点。' : '还没有卡片。今天学完第一段，就把模糊点写成三句话。') + '</div>';
+    return;
+  }
+
+  $('noteList').innerHTML = list.map(function (n, i) {
+    const row = function (k, v) {
+      return v ? '<div class="note-row"><span class="k">' + k + '</span><span class="v ans">' + esc(v) + '</span></div>' : '';
+    };
+    const ext = function (k, v) {
+      return v ? '<div><span>' + k + '</span>' + esc(v) + '</div>' : '';
+    };
+    const hasExt = n.deep || n.wide || n.vertical;
+    return '<div class="note-card" data-note="' + esc(n.id) + '">' +
+      '<div class="note-card-head">' +
+        '<h4>#' + (i + 1) + ' ' + esc(n.title) + '</h4>' +
+        '<span class="pill">' + esc(n.date || '') + '</span>' +
+        '<div class="note-actions">' +
+          '<button class="btn btn-ghost btn-sm" data-reveal="' + esc(n.id) + '" type="button">看答案</button>' +
+          '<button class="btn btn-ghost btn-sm" data-del="' + esc(n.id) + '" type="button">删除</button>' +
+        '</div>' +
+      '</div>' +
+      row('定义', n.def) + row('区别', n.diff) + row('例子', n.ex) +
+      (hasExt ? '<div class="note-ext">' + ext('深度', n.deep) + ext('横向', n.wide) + ext('纵向', n.vertical) + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+function toggleQuiz() {
+  state.quiz = !state.quiz;
+  $('btnQuizToggle').setAttribute('aria-pressed', state.quiz ? 'true' : 'false');
+  $('btnQuizToggle').textContent = state.quiz ? '退出自测' : '开始自测';
+  renderNotes();
+  toast(state.quiz ? '自测模式：先自己想，再点“看答案”' : '已退出自测模式');
+}
+
+function exportNotes() {
+  if (!state.notes.length) { toast('还没有卡片可以导出'); return; }
+  const text = state.notes.map(function (n, i) {
+    return [
+      '#' + (i + 1) + ' ' + n.title + (n.date ? '（' + n.date + '）' : ''),
+      '一句定义：' + (n.def || '—'),
+      '一句区别：' + (n.diff || '—'),
+      '一句例子：' + (n.ex || '—'),
+      '深度拓展：' + (n.deep || '—'),
+      '横向拓展：' + (n.wide || '—'),
+      '纵向拓展：' + (n.vertical || '—')
+    ].join('\n');
+  }).join('\n\n');
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '知识点总结-' + pomoTodayStr() + '.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  toast('已导出 ' + state.notes.length + ' 条');
+}
+
+/* ============================================================
+   O. 起始页快捷书目
+   ============================================================ */
+function renderBookChips() {
+  const keys = Object.keys(CHAPTERS);
+  $('startBooks').innerHTML = keys.map(function (k) {
+    return '<button class="chip" type="button" data-book="' + esc(k) + '">' + esc(k) + '</button>';
+  }).join('');
+  $('startBooks').addEventListener('click', function (e) {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    $('inputSubject').value = chip.dataset.book;
+    $('inputSubject').focus();
+  });
+}
+
+/* ============================================================
+   P. 自检（铁律落地的验收）
+   ============================================================ */
+function selfCheckIds() {
+  const seen = {};
+  const dup = [];
+  Array.prototype.forEach.call(document.querySelectorAll('[id]'), function (el) {
+    if (seen[el.id]) dup.push(el.id);
+    seen[el.id] = true;
+  });
+  if (dup.length) console.error('[DOM] 重复 id（会导致状态错乱）：', dup);
+  else console.log('[DOM] id 唯一性检查通过，共 ' + Object.keys(seen).length + ' 个 id');
+}
+
+function selfCheckChapters() {
+  const bad = [];
+  Object.keys(CHAPTERS).forEach(function (k) {
+    (CHAPTERS[k].list || []).forEach(function (sec, i) {
+      if (!sec || typeof sec !== 'object' || Array.isArray(sec)) bad.push(k + ' 第' + (i + 1) + '条不是对象格式');
+      else if (typeof sec.n !== 'number' || typeof sec.title !== 'string') bad.push(k + ' 第' + (i + 1) + '条缺 n/title');
+    });
+  });
+  if (bad.length) console.error('[CHAPTERS] 章节数据格式不对：', bad);
+  else console.log('[CHAPTERS] 全部为 {n,title,desc} 对象格式，没有三元组数组');
+}
+
+function selfCheckPlan() {
+  const demo = CHAPTERS['认知天性'];
+  const plan = buildPlan('认知天性', demo.list.length, 60, demo.list);
+  const problems = [];
+
+  if (plan.days.length !== RULES.totalDays) problems.push('天数不是 ' + RULES.totalDays + '（实际 ' + plan.days.length + '）');
+  if (plan.plannedSections !== demo.list.length) problems.push('排入章节数与总章节数不一致');
+
+  plan.days.forEach(function (d) {
+    if (typeof d.day !== 'number') problems.push('某天缺 day 编号');
+    if (!Array.isArray(d.study)) problems.push('Day ' + d.day + ' study 不是数组');
+    if (!Array.isArray(d.tasks)) problems.push('Day ' + d.day + ' tasks 不是数组');
+    if (d.isNode && (!d.node || !Array.isArray(d.node.items))) problems.push('Day ' + d.day + ' 节点结构异常');
+    d.tasks.forEach(function (t, i) {
+      if (!t || typeof t.t !== 'string' || typeof t.d !== 'string' || typeof t.min !== 'number') {
+        problems.push('Day ' + d.day + ' 第' + (i + 1) + '条任务字段不全');
+      }
+    });
+    d.study.forEach(function (s) {
+      if (!s || typeof s.n !== 'number' || s.title == null) problems.push('Day ' + d.day + ' 章节对象异常');
+    });
+  });
+
+  RULES.nodes.forEach(function (r) {
+    const d = plan.days[r.day];
+    if (!d || !d.isNode) problems.push('节点 Day ' + r.day + ' 被学新内容覆盖');
+    if (!r.allowStudy && d && d.study.length) problems.push('纯检索日 Day ' + r.day + ' 排了新章节');
+  });
+
+  const seen = {};
+  const dup = [];
+  plan.days.forEach(function (d) {
+    d.study.forEach(function (s) {
+      if (seen[s.n]) dup.push(s.n);
+      seen[s.n] = true;
+    });
+  });
+  if (dup.length) problems.push('章节被重复排入：' + dup.join('、'));
+
+  if (problems.length) console.error('[buildPlan] 自检发现 ' + problems.length + ' 个问题：', problems);
+  else console.log('[buildPlan] 自检通过：31 天齐全、节点日未被覆盖、章节无重复、字段无 undefined');
+  console.log('[buildPlan] 示例结果：', plan);
+}
+
+/* ============================================================
+   Q. 事件绑定与启动
+   ============================================================ */
+function bindEvents() {
+  $('tabPlan').addEventListener('click', function () { switchTab('plan'); });
+  $('tabMethod').addEventListener('click', function () { switchTab('method'); });
+  $('tabPomodoro').addEventListener('click', function () { switchTab('pomodoro'); });
+  $('tabNotes').addEventListener('click', function () { switchTab('notes'); });
+
+  $('btnSearch').addEventListener('click', openChapterPicker);
+  $('btnOpenPicker').addEventListener('click', openChapterPicker);
+  $('btnGenerate').addEventListener('click', function () { generatePlan(false); });
+
+  $('inputSubject').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); openChapterPicker(); }
+  });
+
+  $('btnCloseModal').addEventListener('click', closeChapterPicker);
+  $('btnConfirmChapters').addEventListener('click', function () { generatePlan(true); });
+  $('btnSelectSuggest').addEventListener('click', selectSuggested);
+  $('btnClearAll').addEventListener('click', clearAllChecks);
+
+  $('chapterModal').addEventListener('click', function (e) {
+    if (e.target === $('chapterModal')) closeChapterPicker();
+  });
+
+  /* 勾选：只监听 change。label 包裹 input 时浏览器只会转发一次点击，
+     这里不再额外绑定 click 手动 toggle，避免二次触发把状态翻回去 */
+  $('modalList').addEventListener('change', function (e) {
+    const cb = e.target;
+    if (!cb || cb.type !== 'checkbox') return;
+    const n = Number(cb.dataset.n);
+    if (Number.isNaN(n)) return;
+    if (cb.checked) state.selected.add(n);
+    else state.selected.delete(n);
+    updateModalCount();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !$('chapterModal').hidden) closeChapterPicker();
+  });
+
+  $('planList').addEventListener('change', function (e) {
+    const cb = e.target;
+    if (!cb || cb.type !== 'checkbox' || !cb.dataset.dayChk) return;
+    toggleDayDone(Number(cb.dataset.dayChk), cb.checked);
+  });
+
+  $('selFilter').addEventListener('change', function () {
+    state.filter = $('selFilter').value;
+    renderDays();
+  });
+
+  $('btnRegenerate').addEventListener('click', function () { generatePlan(false); });
+  $('btnBackStart').addEventListener('click', function () {
+    showStartView();
+    switchTab('plan');
+  });
+  $('btnResetProgress').addEventListener('click', function () {
+    const plan = state.plan;
+    if (!plan) return;
+    saveDone(plan.subject, []);
+    state.done = new Set();
+    renderDays();
+    updateProgressBar();
+    toast('已清空《' + plan.subject + '》的打卡记录');
+  });
+
+  $('pomoModeFocus').addEventListener('click', function () { pomoSetMode('focus'); });
+  $('pomoModeShort').addEventListener('click', function () { pomoSetMode('short'); });
+  $('pomoModeLong').addEventListener('click', function () { pomoSetMode('long'); });
+  $('btnPomoStart').addEventListener('click', pomoStartPause);
+  $('btnPomoReset').addEventListener('click', pomoReset);
+  $('btnPomoSkip').addEventListener('click', pomoSkip);
+
+  $('btnAddNote').addEventListener('click', addNote);
+  $('btnQuizToggle').addEventListener('click', toggleQuiz);
+  $('btnExportNotes').addEventListener('click', exportNotes);
+  $('noteSearch').addEventListener('input', renderNotes);
+
+  $('noteList').addEventListener('click', function (e) {
+    const revealBtn = e.target.closest('[data-reveal]');
+    if (revealBtn) {
+      const card = revealBtn.closest('.note-card');
+      if (card) {
+        const on = card.classList.toggle('revealed');
+        revealBtn.textContent = on ? '收起答案' : '看答案';
+      }
+      return;
+    }
+    const delBtn = e.target.closest('[data-del]');
+    if (delBtn) {
+      const id = delBtn.dataset.del;
+      const idx = state.notes.findIndex(function (n) { return n.id === id; });
+      if (idx !== -1) {
+        const name = state.notes[idx].title;
+        state.notes.splice(idx, 1);
+        saveNotes();
+        renderNotes();
+        toast('已删除：' + name);
+      }
+    }
+  });
+
+  ['noteTitle', 'noteDef', 'noteDiff', 'noteEx', 'noteDeep', 'noteWide', 'noteVertical'].forEach(function (id) {
+    $(id).addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); addNote(); }
+    });
+  });
+}
+
+function restorePick() {
+  const pick = store.get(KEY_PICK, null);
+  if (!pick || !pick.key || !CHAPTERS[pick.key]) return;
+  state.bookKey = pick.key;
+  state.bookData = CHAPTERS[pick.key];
+  $('inputSubject').value = pick.key;
+  if (pick.dailyMin) {
+    state.dailyMin = Number(pick.dailyMin);
+    const opt = Array.prototype.slice.call($('selDailyMin').options).filter(function (o) {
+      return Number(o.value) === state.dailyMin;
+    })[0];
+    if (opt) $('selDailyMin').value = String(state.dailyMin);
+  }
+  // 勾选状态不自动恢复：按铁律，每次打开弹框默认全不选，只高亮建议章节
+  updateModalCount();
+}
+
+function init() {
+  renderBookChips();
+  renderMethod();
+  pomoLoad();
+  pomoSetMode('focus');
+  loadNotes();
+  renderNotes();
+  restorePick();
+  bindEvents();
+
+  selfCheckIds();
+  selfCheckChapters();
+  selfCheckPlan();
+  console.log('[学习闭环] 启动完成：4 个页签、章节弹框、计划引擎、番茄钟、知识点全部就绪。');
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
