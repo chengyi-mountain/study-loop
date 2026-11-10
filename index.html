@@ -184,6 +184,7 @@ a { color: var(--accent); }
 .btn-green { background: var(--green); color: #fff; }
 .btn-green:hover { filter: brightness(1.06); }
 .btn-sm { padding: 7px 13px; font-size: 13px; border-radius: 9px; font-weight: 500; }
+.select-inline { width: auto; min-width: 104px; padding: 7px 28px 7px 11px; font-size: 13px; border-radius: 9px; }
 .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {
@@ -504,6 +505,11 @@ a { color: var(--accent); }
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
 table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 560px; }
 th, td { text-align: left; padding: 10px 13px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+/* 窄屏别让表格横着拖：压掉 min-width，让单元格自己换行 */
+@media (max-width: 620px) {
+  table { min-width: 0; font-size: 12.2px; }
+  th, td { padding: 8px 8px; }
+}
 th { background: #faf6ec; font-weight: 600; color: var(--ink); font-size: 13px; white-space: nowrap; }
 tbody tr:last-child td { border-bottom: 0; }
 td b { color: var(--accent); font-weight: 600; }
@@ -610,6 +616,9 @@ td b { color: var(--accent); font-weight: 600; }
 @media (max-width: 760px) { .note-form-grid { grid-template-columns: 1fr; } }
 .note-form-grid .full { grid-column: 1 / -1; }
 .note-list-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 12px; }
+.note-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; min-width: 0; max-width: 100%; }
+.note-actions .input { width: 170px; min-width: 0; flex: 1 1 130px; padding: 7px 11px; font-size: 13px; }
+@media (max-width: 520px) { .note-actions { margin-left: 0; width: 100%; } .note-actions .input { flex: 1 1 100%; width: auto; } }
 .note-list-head h3 { font-size: 16px; }
 .note-card {
   background: var(--paper);
@@ -764,7 +773,8 @@ td b { color: var(--accent); font-weight: 600; }
             <span><i style="background:var(--amber);"></i>检索节点日</span>
             <span><i style="background:var(--line);"></i>学新内容日</span>
           </div>
-          <div class="btn-row" style="margin-top:8px;">
+          <div class="btn-row" style="margin-top:8px; align-items:center;">
+            <select class="select select-inline" id="selDailyMinTop" aria-label="每天投入"></select>
             <button class="btn btn-ghost btn-sm" id="btnRegenerate" type="button">↻ 重新生成</button>
             <button class="btn btn-ghost btn-sm" id="btnResetProgress" type="button">清空打卡</button>
             <button class="btn btn-ghost btn-sm" id="btnBackStart" type="button">换一本书</button>
@@ -873,7 +883,7 @@ td b { color: var(--accent); font-weight: 600; }
       <h3>我的知识卡片</h3>
       <span class="hint" id="noteCount">0 条</span>
       <div class="note-actions">
-        <input class="input" id="noteSearch" type="text" placeholder="搜索知识点" style="width:170px; padding:7px 11px; font-size:13px;">
+        <input class="input" id="noteSearch" type="text" placeholder="搜索知识点">
         <button class="btn btn-ghost btn-sm" id="btnQuizToggle" type="button" aria-pressed="false">开始自测</button>
         <button class="btn btn-ghost btn-sm" id="btnExportNotes" type="button">导出 txt</button>
       </div>
@@ -1361,6 +1371,15 @@ const RULES = {
   perSectionMin: 50,      // 一节完整走一遍六步 ≈ 50 分钟
   maxPerDay: 3,           // 一天最多啃 3 节，再多就是自欺欺人
 
+  /* 每天投入怎么落地：预算 → 一天几节 + 每项任务几分钟 */
+  budgetBuffer: 5,        // 预算里留 5 分钟机动（喝水、找纸、发呆）
+  minDayMinutes: 20,      // 再往下就装不下六步流程了，压缩到此为止
+  scaleMin: 0.55,         // 任务压缩的下限（再短就不叫“默框架”了）
+  scaleMax: 1.4,          // 单节环节放大的上限（预算再高也不把“记关键词”拉成 80 分钟）
+  addonMin: 15,           // 预算还剩 15 分钟以上才补加练
+  addonMax: 25,           // 一条加练最多 25 分钟
+  addonLimit: 2,          // 一天最多补两条加练，别把卡片堆爆
+
   nodes: [
     {
       day: 0,
@@ -1490,6 +1509,55 @@ function studyTasks(sections, canMix) {
   return list;
 }
 
+/* 预算实在太紧时先砍任务条数，而不是把每项都压到 5 分钟：
+   25 分钟的预算装不下五项流程，硬塞出来的“记关键词 5 分钟”毫无意义 */
+function slimTasks(tasks, budget) {
+  const limit = budget < 35 ? 3 : (budget < 45 ? 4 : tasks.length);
+  if (tasks.length <= limit) return tasks;
+  const droppable = /翻书对比|轻混|换题型|换形态/;
+  const kept = tasks.filter(function (t) { return !droppable.test(t.t); });
+  return kept.slice(0, limit);
+}
+
+/* 「每天投入」的第一层：把各环节按权重缩放到当天预算内。
+   单节环节有合理上限（scaleMax）——预算再高也不把“记关键词”拉成 80 分钟，
+   富余的预算交给 leftoverAddon 去补检索/加练任务。 */
+function fitTasks(tasks, budget) {
+  const list = tasks.map(function (t) {
+    return { t: t.t, d: t.d, out: t.out, min: Math.round(t.min || 0), fixed: (t.min || 0) < 5 };
+  });
+
+  const flex = list.filter(function (t) { return !t.fixed; });
+  const fixedSum = list.reduce(function (s, t) { return s + (t.fixed ? t.min : 0); }, 0);
+  const flexSum = flex.reduce(function (s, t) { return s + t.min; }, 0) || 1;
+
+  const scale = Math.max(RULES.scaleMin, Math.min(RULES.scaleMax, (budget - fixedSum) / flexSum));
+  flex.forEach(function (t) { t.min = Math.max(5, Math.round(t.min * scale)); });
+
+  // 预算不够时（压到下限了还超），从最长的一项里扣，保证当天不超预算
+  let total = list.reduce(function (s, t) { return s + t.min; }, 0);
+  if (total > budget && flex.length) {
+    let big = flex[0];
+    flex.forEach(function (t) { if (t.min > big.min) big = t; });
+    big.min = Math.max(5, big.min - (total - budget));
+  }
+
+  return list.map(function (t) { return { t: t.t, d: t.d, out: t.out, min: t.min }; });
+}
+
+/* 「每天投入」的第二层：预算还有空档时补一条加练，别让 120 分钟只干 50 分钟的事 */
+function leftoverAddon(studied, dayIndex, minutes) {
+  if (!studied.length || minutes < RULES.addonMin) return null;
+  const pick = seededPick(studied, Math.min(2, studied.length), dayIndex + 11);
+  return {
+    t: '加练 · 回炉 ' + briefOf(pick),
+    min: Math.min(Math.round(minutes), RULES.addonMax),
+    d: '预算还有空：抽已学的一节再闭卷默一次骨架，只默骨架不展开，别当成重学一遍',
+    out: '一张补做的骨架图'
+  };
+}
+
+
 /* 确定性抽样：同一个计划每次打开抽到的章节一致，方便照做 */
 function seededPick(list, count, salt) {
   const pool = list.slice();
@@ -1565,15 +1633,21 @@ function buildPlan(subject, totalSections, dailyMin, sections) {
   for (let d = 0; d < RULES.totalDays; d++) if (canStudyOn(d)) studyDayCount.push(d);
 
   // 每天要啃几节：既要装得下整本书，又不能超过脑力上限
-  const need = pool.length ? Math.ceil(pool.length / studyDayCount.length) : 1;
-  const perDay = Math.max(1, Math.min(Math.max(need, 1), RULES.maxPerDay));
+  // 预算：扣掉机动时间后，一天真正能干活的分钟
+  const budget = Math.max(RULES.minDayMinutes, dailyMin - RULES.budgetBuffer);
+  // 第一层约束：一天最多啃几节，由预算按"一节 ≈ perSectionMin"算出来
+  const perDayCap = Math.max(1, Math.min(RULES.maxPerDay, Math.floor((budget - 3) / RULES.perSectionMin)));
 
+  const need = pool.length ? Math.ceil(pool.length / studyDayCount.length) : 1;
+  const perDay = Math.max(1, Math.min(Math.min(Math.max(need, 1), RULES.maxPerDay), perDayCap));
+
+  // 第二层约束：一天只排 perDay 节时，预算够不够走完标准六步
   let warn = null;
-  const budget = dailyMin - 10;
-  const fitByTime = Math.floor(budget / RULES.perSectionMin);
-  if (perDay > Math.max(fitByTime, 1)) {
-    warn = '按每天 ' + dailyMin + ' 分钟，一天排 ' + perDay + ' 节偏紧（一节完整走完六步约 ' + RULES.perSectionMin + ' 分钟）。' +
-           '建议把每天投入调到 ' + (perDay * RULES.perSectionMin + 15) + ' 分钟以上，或者少勾几章。';
+  const stdDayMin = 3 + RULES.perSectionMin * perDay;
+  if (budget < stdDayMin * 0.7) {
+    warn = '每天 ' + dailyMin + ' 分钟装不下 ' + perDay + ' 节的标准六步（约 ' + stdDayMin +
+           ' 分钟），任务已压到最短。建议把投入调到 ' +
+           (Math.ceil((stdDayMin * 0.9 + RULES.budgetBuffer) / 15) * 15) + ' 分钟以上，或者少勾几章。';
   }
 
   let cursor = 0;
@@ -1667,12 +1741,13 @@ function buildPlan(subject, totalSections, dailyMin, sections) {
 
     // ② 再判断 study：只有允许学新内容的日期才发章节
     if (!rule || rule.allowStudy) {
-      // 均分：第 i 个学习日拿 floor((i+1)*总/N) - floor(i*总/N) 节，前后均匀不堆在一头
-      let quota = Math.floor((studyIdx + 1) * pool.length / studyDayCount.length)
-                - Math.floor(studyIdx * pool.length / studyDayCount.length);
+      // 均分：第 i 个学习日累计 floor((i+1)*总/N)，前后均匀不堆在一头；
+      // 但一天不得超过 perDay（预算），截掉的额度留在后面补，补不回来才算 overflow
+      const target = Math.floor((studyIdx + 1) * pool.length / studyDayCount.length);
+      let quota = Math.min(target, perDay * (studyIdx + 1)) - cursor;
       // Day 0 必须开张：只要还有章节，就先排 1 节，别让第一天是空壳
       if (studyIdx === 0 && pool.length > 0) quota = Math.max(1, quota);
-      quota = Math.min(quota, pool.length - cursor);
+      quota = Math.min(Math.max(quota, 0), perDay, pool.length - cursor);
       studyIdx += 1;
       day.study = grabSections(quota);
     }
@@ -1702,16 +1777,34 @@ function buildPlan(subject, totalSections, dailyMin, sections) {
       }
     }
 
-    let mins = 0;
-    day.tasks.forEach(function (t) { mins += (t.min || 0); });
-    day.minutes = mins;
+    // ④ 先按预算砍条数（预算紧时），再按预算缩放分钟
+    day.tasks = fitTasks(slimTasks(day.tasks, budget), budget);
 
+    // ⑤ 预算还有空档就补加练（节点日只补一条，保持当天的检索仪式不被冲淡）
+    if (studied.length) {
+      const addonLimit = rule ? 1 : RULES.addonLimit;
+      for (let k = 0; k < addonLimit; k++) {
+        const used = day.tasks.reduce(function (s, t) { return s + (t.min || 0); }, 0);
+        const extra = leftoverAddon(studied, d + k * 7, budget - used);
+        if (!extra) break;
+        day.tasks.push(extra);
+      }
+    }
+
+    day.minutes = day.tasks.reduce(function (s, t) { return s + (t.min || 0); }, 0);
     days.push(day);
   }
+
+  let totalMinutes = 0;
+  days.forEach(function (x) { totalMinutes += x.minutes; });
+  const avgMinutes = days.length ? Math.round(totalMinutes / days.length) : 0;
 
   const plan = {
     subject: subject,
     dailyMin: dailyMin,
+    budget: budget,
+    perDayCap: perDayCap,
+    avgMinutes: avgMinutes,
     totalSections: totalSections,
     plannedSections: cursor,
     sectionsPerDay: perDay,
@@ -1753,11 +1846,17 @@ function renderPlan() {
 
   $('planSubject').textContent = plan.subject;
   $('planSub').textContent =
-    '每天 ' + plan.dailyMin + ' 分钟 · 一天啃 ' + plan.sectionsPerDay + ' 节 · 共排 ' +
-    plan.plannedSections + ' 节，' + plan.nodeCount + ' 个检索节点固定不动';
+    '每天 ' + plan.dailyMin + ' 分钟预算 · 一天最多啃 ' + plan.sectionsPerDay + ' 节 · 日均 ' +
+    plan.avgMinutes + ' 分钟 · 共排 ' + plan.plannedSections + ' 节，' + plan.nodeCount + ' 个检索节点固定不动';
 
   $('metaSections').textContent = String(plan.plannedSections);
   $('metaDaily').textContent = String(plan.dailyMin);
+  if ($('selDailyMinTop')) {
+    const topOpt = Array.prototype.slice.call($('selDailyMinTop').options).filter(function (o) {
+      return Number(o.value) === plan.dailyMin;
+    })[0];
+    if (topOpt) $('selDailyMinTop').value = String(plan.dailyMin);
+  }
   $('metaNodeDays').textContent = String(plan.nodeCount);
   $('metaStudyDays').textContent = String(plan.studyDayCount);
 
@@ -2526,6 +2625,20 @@ function bindEvents() {
   });
 
   $('btnRegenerate').addEventListener('click', function () { generatePlan(false); });
+
+  // 计划页上的"每天投入"：选项从起始页那个 select 复制一份，避免两处写死
+  (function () {
+    const src = $('selDailyMin');
+    const dst = $('selDailyMinTop');
+    if (!src || !dst) return;
+    dst.innerHTML = src.innerHTML;
+    dst.value = src.value;
+    dst.addEventListener('change', function () {
+      $('selDailyMin').value = dst.value;
+      state.dailyMin = Number(dst.value) || 60;
+      generatePlan(false);
+    });
+  })();
   $('btnBackStart').addEventListener('click', function () {
     showStartView();
     switchTab('plan');
