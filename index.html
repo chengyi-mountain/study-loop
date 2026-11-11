@@ -648,12 +648,108 @@ td b { color: var(--accent); font-weight: 600; }
   line-height: 1.75;
 }
 .pomo-note b { color: var(--accent); }
+.pomo-tune {
+  max-width: 560px;
+  margin: 0 auto 4px;
+  padding: 14px 16px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  background: #fffdf8;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pomo-tune-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pomo-tune-row > .f-label { flex: 0 0 auto; margin: 0; }
+.pomo-quick { display: flex; gap: 6px; flex-wrap: wrap; }
+.pomo-quick .pomo-mode { padding: 5px 12px; font-size: 12.5px; }
+.pomo-min-input { width: 92px; flex: 0 0 auto; padding: 7px 10px; font-size: 13px; }
+.pomo-noise-select { flex: 1 1 140px; min-width: 120px; padding: 7px 10px; font-size: 13px; }
+.pomo-vol { flex: 1 1 120px; min-width: 100px; accent-color: var(--accent); }
+.pomo-vol-text { font-size: 12px; color: var(--ink-3); min-width: 38px; font-variant-numeric: tabular-nums; }
+.pomo-notify-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-3); flex-wrap: wrap; }
+.pomo-notify-row input { accent-color: var(--accent); }
+.pomo-chime {
+  display: none;
+  margin: 0 auto 14px;
+  max-width: 520px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fdf1e3;
+  border: 1px solid #e8c79a;
+  color: #8a4b12;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: center;
+}
+.pomo-chime.on { display: block; }
 
 /* ============================================================
    9. 知识点总结
    ============================================================ */
 .notes-grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
 .note-form { padding: 22px 24px; }
+.note-sections { padding: 20px 22px; margin-bottom: 16px; }
+.note-sec-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.note-sec-head h3 { font-size: 16px; }
+.note-sec-head .hint { flex: 1 1 auto; }
+.note-sec-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.note-sec-row.empty { background: #fbf9f4; border-style: dashed; }
+.note-sec-row .idx {
+  flex: 0 0 auto;
+  min-width: 30px;
+  font-size: 12px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.note-sec-row .name {
+  flex: 1 1 160px;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.note-sec-row.empty .name { color: var(--ink-3); }
+.note-sec-row .count { flex: 0 0 auto; }
+.note-sec-row .count .pill { font-size: 11.5px; }
+.note-target {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 10px 0 2px;
+  padding: 8px 12px;
+  background: #f6f8f4;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.note-sec-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+  flex-wrap: wrap;
+}
+.note-sec-group::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--line);
+}
 .note-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
 @media (max-width: 760px) { .note-form-grid { grid-template-columns: 1fr; } }
 .note-form-grid .full { grid-column: 1 / -1; }
@@ -879,8 +975,37 @@ td b { color: var(--accent); font-weight: 600; }
         <button class="pomo-mode" id="pomoModeShort" type="button" data-mode="short" aria-pressed="false">短休息 5 分钟</button>
         <button class="pomo-mode" id="pomoModeLong" type="button" data-mode="long" aria-pressed="false">长休息 20 分钟</button>
       </div>
+      <div class="pomo-tune">
+        <div class="pomo-tune-row">
+          <span class="f-label">专注时长</span>
+          <div class="pomo-quick" id="pomoQuick" role="group" aria-label="专注时长快选">
+            <button class="pomo-mode" type="button" data-min="15">15 分钟</button>
+            <button class="pomo-mode" type="button" data-min="25">25 分钟</button>
+            <button class="pomo-mode" type="button" data-min="45">45 分钟</button>
+            <button class="pomo-mode" type="button" data-min="60">60 分钟</button>
+          </div>
+          <input class="input pomo-min-input" id="pomoCustomMin" type="number" min="1" max="180" step="1" placeholder="自定义">
+          <button class="btn btn-ghost btn-sm" id="btnPomoApplyMin" type="button">应用</button>
+        </div>
+        <div class="pomo-tune-row">
+          <span class="f-label">白噪音</span>
+          <select class="input pomo-noise-select" id="pomoNoise" aria-label="白噪音">
+            <option value="off">安静（不放）</option>
+            <option value="brown">棕噪声 · 沉稳沙沙</option>
+            <option value="rain">雨声 · 窗外下雨</option>
+            <option value="ocean">海浪 · 一阵一阵</option>
+          </select>
+          <input class="pomo-vol" id="pomoNoiseVol" type="range" min="0" max="100" step="5" value="35" aria-label="白噪音音量">
+          <span class="pomo-vol-text" id="pomoNoiseVolText">35%</span>
+        </div>
+        <div class="pomo-notify-row">
+          <input id="pomoNotify" type="checkbox" checked>
+          <label for="pomoNotify">结束后发系统通知（首次会问你要权限；不勾就用铃声 + 标题闪烁）</label>
+        </div>
+      </div>
       <div class="pomo-clock" id="pomoClock">25:00</div>
       <div class="pomo-state" id="pomoState">先骗自己坐下来，坐下来就赢了一半</div>
+      <div class="pomo-chime" id="pomoChime">⏰ 时间到！先站起来，别急着点下一段</div>
       <div class="pomo-dots" id="pomoDots"></div>
       <div class="pomo-actions">
         <button class="btn btn-primary" id="btnPomoStart" type="button">开始</button>
@@ -905,11 +1030,29 @@ td b { color: var(--accent); font-weight: 600; }
 
   <!-- ========================= 面板四：知识点总结 ========================= -->
   <section class="panel" id="panelNotes" role="tabpanel" aria-labelledby="tabNotes" hidden>
+    <div class="card note-sections">
+      <div class="note-sec-head">
+        <h3>所选章节知识点总结</h3>
+        <span class="hint" id="noteSecInfo">还没生成计划</span>
+        <div class="note-actions">
+          <button class="btn btn-ghost btn-sm" id="btnExportTemplate" type="button">导出待填模板</button>
+        </div>
+      </div>
+      <p class="hint" style="margin-top:6px;">
+        每学完一章就给它写一张卡：点章节名 → 卡片自动绑到这一章；下面的卡片会按章分组。没有卡片的章节会标灰，提醒你补。
+      </p>
+      <div id="noteSecList"></div>
+    </div>
+
     <div class="card note-form">
       <h3 style="font-size:17px;">知识点总结 · 三句话 + 三方向</h3>
       <p class="hint" style="margin-top:5px;">
         每个模糊点写三句话（定义 / 区别 / 例子），再补三方向拓展。数据只存在你自己的浏览器里，不联网。
       </p>
+      <div class="note-target" id="noteTarget" hidden>
+        <span class="pill-green" id="noteTargetText"></span>
+        <button class="btn btn-ghost btn-sm" id="btnClearNoteTarget" type="button">不关联章节</button>
+      </div>
       <div class="note-form-grid">
         <div class="field full">
           <label class="f-label" for="noteTitle">知识点</label>
@@ -1320,7 +1463,8 @@ const state = {
   filter: 'all',
   notes: [],
   quiz: false,
-  pomo: { mode: 'focus', left: 1500, timer: 0, running: false, cycle: 0 }
+  pomo: { mode: 'focus', left: 1500, timer: 0, running: false, cycle: 0, focusSec: 1500, noise: 'off', noiseVol: 35, notify: true },
+  noteSection: null      // 当前写卡绑定的章节 { n, title }
 };
 
 /* ============================================================
@@ -1489,6 +1633,7 @@ function generatePlan(fromModal) {
   renderPlan();
   showPlanView();
   switchTab('plan');
+  renderNoteSections();   // 计划变了，「所选章节知识点总结」跟着变
 
   console.log('[学习闭环] buildPlan 结果：', plan);
   if (plan.overflow > 0) {
@@ -1962,6 +2107,8 @@ function buildPlan(subject, totalSections, dailyMin, sections) {
     nodeCount: RULES.nodes.length,
     overflow: Math.max(0, pool.length - cursor),
     warn: warn,
+    // 供「所选章节知识点总结」用：这次实际排进计划的章节清单（不改动 pool）
+    sectionList: pool.slice(0, cursor).map(function (s) { return { n: s.n, title: s.title }; }),
     days: days
   };
 
@@ -2353,16 +2500,25 @@ function switchTab(name) {
     p.hidden = !on;
   });
   if (target) window.scrollTo({ top: 0, behavior: 'smooth' });
+  // 进知识点页时刷新"所选章节"这一块（计划可能刚变过）
+  if (name === 'notes') {
+    renderNoteSections();
+    renderNoteTarget();
+  }
 }
 
 /* ============================================================
    M. 番茄钟
    ============================================================ */
-const POMO_MODES = {
-  focus: { label: '专注', sec: 25 * 60, next: 'short' },
-  short: { label: '短休息', sec: 5 * 60, next: 'focus' },
-  long: { label: '长休息', sec: 20 * 60, next: 'focus' }
-};
+const POMO_FOCUS_DEFAULT = 25 * 60;
+const POMO_FIXED = { short: 5 * 60, long: 20 * 60 };
+const POMO_LABEL = { focus: '专注', short: '短休息', long: '长休息' };
+
+/** 当前模式的秒数：专注可自定义，休息固定 5 / 20 */
+function pomoModeSec(mode) {
+  if (mode === 'focus') return state.pomo.focusSec || POMO_FOCUS_DEFAULT;
+  return POMO_FIXED[mode] || POMO_FOCUS_DEFAULT;
+}
 
 function pomoTodayStr() {
   const d = new Date();
@@ -2374,10 +2530,26 @@ function pomoLoad() {
   const today = pomoTodayStr();
   state.pomo.todayCount = saved.date === today ? (saved.today || 0) : 0;
   state.pomo.totalCount = saved.total || 0;
+  // 自定义专注时长 / 白噪音 / 音量 / 系统通知开关，一并记住
+  const fs = Number(saved.focusSec);
+  state.pomo.focusSec = (fs >= 60 && fs <= 180 * 60) ? fs : POMO_FOCUS_DEFAULT;
+  state.pomo.noise = (saved.noise === 'brown' || saved.noise === 'rain' || saved.noise === 'ocean') ? saved.noise : 'off';
+  const vol = Number(saved.noiseVol);
+  state.pomo.noiseVol = (vol >= 0 && vol <= 100) ? vol : 35;
+  state.pomo.notify = saved.notify !== false;
+  state.pomo.left = pomoModeSec(state.pomo.mode);
 }
 
 function pomoSave() {
-  store.set(KEY_POMO, { date: pomoTodayStr(), today: state.pomo.todayCount || 0, total: state.pomo.totalCount || 0 });
+  store.set(KEY_POMO, {
+    date: pomoTodayStr(),
+    today: state.pomo.todayCount || 0,
+    total: state.pomo.totalCount || 0,
+    focusSec: state.pomo.focusSec || POMO_FOCUS_DEFAULT,
+    noise: state.pomo.noise || 'off',
+    noiseVol: state.pomo.noiseVol == null ? 35 : state.pomo.noiseVol,
+    notify: state.pomo.notify !== false
+  });
 }
 
 function pomoFmt(sec) {
@@ -2389,17 +2561,21 @@ function pomoFmt(sec) {
 
 function pomoRender() {
   const p = state.pomo;
+  const sec = pomoModeSec(p.mode);
+  const focusMin = Math.round(pomoModeSec('focus') / 60);
   $('pomoClock').textContent = pomoFmt(p.left);
   $('pomoClock').classList.toggle('running', !!p.running);
-  $('btnPomoStart').textContent = p.running ? '暂停' : (p.left === POMO_MODES[p.mode].sec ? '开始' : '继续');
+  $('btnPomoStart').textContent = p.running ? '暂停' : (p.left === sec ? '开始' : '继续');
   $('pomoState').textContent = p.running
-    ? ('正在进行：' + POMO_MODES[p.mode].label + (p.mode === 'focus' ? '（手机扔远，只做一件事）' : '（站起来走两步，别刷手机）'))
-    : (p.left === POMO_MODES[p.mode].sec ? '先骗自己坐下来，坐下来就赢了一半' : '已暂停，随时可以继续');
+    ? ('正在进行：' + POMO_LABEL[p.mode] + (p.mode === 'focus' ? '（手机扔远，只做一件事）' : '（站起来走两步，别刷手机）'))
+    : (p.left === sec ? '先骗自己坐下来，坐下来就赢了一半' : '已暂停，随时可以继续');
 
-  Object.keys(POMO_MODES).forEach(function (k) {
+  ['focus', 'short', 'long'].forEach(function (k) {
     const btn = $(k === 'focus' ? 'pomoModeFocus' : (k === 'short' ? 'pomoModeShort' : 'pomoModeLong'));
     if (btn) btn.setAttribute('aria-pressed', p.mode === k ? 'true' : 'false');
   });
+  // 专注档的时长跟着自定义值走
+  $('pomoModeFocus').textContent = '专注 ' + focusMin + ' 分钟';
 
   const dots = $('pomoDots');
   const filled = (p.cycle || 0) % 4;
@@ -2410,13 +2586,38 @@ function pomoRender() {
   $('pomoToday').textContent = String(p.todayCount || 0);
   $('pomoTotal').textContent = String(p.totalCount || 0);
   $('pomoCycle').textContent = String(filled);
+
+  // 快选高亮：当前专注时长正好等于某个预设才点亮
+  Array.prototype.forEach.call(document.querySelectorAll('#pomoQuick .pomo-mode'), function (b) {
+    b.setAttribute('aria-pressed', (Number(b.dataset.min) * 60 === pomoModeSec('focus')) ? 'true' : 'false');
+  });
+  if ($('pomoNoise')) $('pomoNoise').value = p.noise || 'off';
+  if ($('pomoNoiseVol')) $('pomoNoiseVol').value = String(p.noiseVol == null ? 35 : p.noiseVol);
+  if ($('pomoNoiseVolText')) $('pomoNoiseVolText').textContent = (p.noiseVol == null ? 35 : p.noiseVol) + '%';
+  if ($('pomoNotify')) $('pomoNotify').checked = p.notify !== false;
+}
+
+/** 设定专注时长（分钟），1–180 */
+function pomoApplyFocusMin(min, quiet) {
+  const m = Math.round(Number(min));
+  if (!(m >= 1 && m <= 180)) {
+    toast('专注时长请填 1–180 分钟');
+    return false;
+  }
+  state.pomo.focusSec = m * 60;
+  pomoSave();
+  if (state.pomo.mode === 'focus' && !state.pomo.running) state.pomo.left = m * 60;
+  pomoRender();
+  if (!quiet) toast('专注时长已设为 ' + m + ' 分钟');
+  return true;
 }
 
 function pomoSetMode(mode) {
-  if (!POMO_MODES[mode]) return;
+  if (!POMO_LABEL[mode]) return;
   pomoStopTimer();
+  noiseStop();
   state.pomo.mode = mode;
-  state.pomo.left = POMO_MODES[mode].sec;
+  state.pomo.left = pomoModeSec(mode);
   state.pomo.running = false;
   state.pomo.endAt = 0;
   pomoRender();
@@ -2436,12 +2637,17 @@ function pomoStartPause() {
     p.running = false;
     p.endAt = 0;
     pomoStopTimer();
+    noiseStop();
     pomoRender();
     return;
   }
   p.running = true;
   p.endAt = Date.now() + p.left * 1000;
   pomoStopTimer();
+  hideChime();
+  flashTitleStop();
+  askNotifyPermission();
+  if (p.mode === 'focus') noiseStart(p.noise);
   p.timer = window.setInterval(function () {
     const left = Math.round((state.pomo.endAt - Date.now()) / 1000);
     state.pomo.left = Math.max(0, left);
@@ -2454,11 +2660,12 @@ function pomoStartPause() {
 function pomoFinish() {
   const p = state.pomo;
   pomoStopTimer();
+  noiseStop();
   p.running = false;
   p.endAt = 0;
   p.left = 0;
   pomoRender();
-  beep(p.mode === 'focus' ? 3 : 2);
+  pomoAlert(p.mode === 'focus' ? '专注结束，去休息' : '休息结束，回来继续');
 
   if (p.mode === 'focus') {
     p.todayCount = (p.todayCount || 0) + 1;
@@ -2469,22 +2676,25 @@ function pomoFinish() {
     toast('番茄完成，共 ' + p.totalCount + ' 个。' + (next === 'long' ? '进长休息 20 分钟。' : '休息 5 分钟。'));
     pomoSetMode(next);
   } else {
-    toast('休息结束，回来做下一个 25 分钟。');
+    toast('休息结束，回来做下一个专注。');
     pomoSetMode('focus');
   }
 }
 
 function pomoReset() {
   pomoStopTimer();
+  noiseStop();
+  hideChime();
   state.pomo.running = false;
   state.pomo.endAt = 0;
-  state.pomo.left = POMO_MODES[state.pomo.mode].sec;
+  state.pomo.left = pomoModeSec(state.pomo.mode);
   pomoRender();
 }
 
 function pomoSkip() {
   const p = state.pomo;
   pomoStopTimer();
+  noiseStop();
   p.running = false;
   p.endAt = 0;
   if (p.mode === 'focus') {
@@ -2495,6 +2705,154 @@ function pomoSkip() {
     pomoSetMode('focus');
   }
   toast('已跳过这一段');
+}
+
+/* ---------------- 结束提醒：铃声 + 标题闪烁 + 系统通知 ---------------- */
+
+let titleFlashTimer = 0;
+let titleOrigin = '';
+
+function flashTitleStop() {
+  if (titleFlashTimer) {
+    window.clearInterval(titleFlashTimer);
+    titleFlashTimer = 0;
+    document.title = titleOrigin || document.title;
+  }
+  titleOrigin = '';
+}
+
+function flashTitle(msg) {
+  if (!titleOrigin) titleOrigin = document.title;
+  if (titleFlashTimer) window.clearInterval(titleFlashTimer);
+  // 第一下立刻生效：切到别的标签页也能马上看到
+  document.title = '⏰ ' + msg;
+  let on = true;
+  titleFlashTimer = window.setInterval(function () {
+    document.title = on ? titleOrigin : ('⏰ ' + msg);
+    on = !on;
+  }, 900);
+}
+
+function hideChime() {
+  const el = $('pomoChime');
+  if (el) el.classList.remove('on');
+}
+
+function showChime(msg) {
+  const el = $('pomoChime');
+  if (!el) return;
+  el.textContent = '⏰ ' + msg + '。先站起来，别急着点下一段';
+  el.classList.add('on');
+}
+
+function askNotifyPermission() {
+  try {
+    if (state.pomo.notify === false) return;
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') Notification.requestPermission();
+  } catch (e) { /* 某些浏览器不支持，忽略 */ }
+}
+
+function pomoAlert(msg) {
+  beep(state.pomo.mode === 'focus' ? 6 : 4);
+  showChime(msg);
+  flashTitle(msg);
+  try {
+    if (state.pomo.notify !== false && 'Notification' in window && Notification.permission === 'granted') {
+      new Notification('学习闭环 · 番茄钟', { body: msg + '（点一下回到页面）', tag: 'xh-pomo' });
+    }
+  } catch (e) { /* 忽略 */ }
+}
+
+/* ---------------- 白噪音：现场合成，不需要音频文件 ---------------- */
+
+const noise = { ctx: null, src: null, gain: null, lfo: null, kind: 'off' };
+
+function noiseVolume() {
+  const v = state.pomo.noiseVol == null ? 35 : Number(state.pomo.noiseVol);
+  return Math.max(0, Math.min(1, v / 100));
+}
+
+function noiseBuffer(ctx, kind) {
+  const n = Math.floor(ctx.sampleRate * 3);
+  const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < n; i++) {
+    const white = Math.random() * 2 - 1;
+    if (kind === 'rain') {
+      d[i] = white * 0.7;
+    } else {
+      // 棕噪声：低频占主导，比白噪声耐听，不刺耳
+      last = (last + 0.02 * white) / 1.02;
+      d[i] = last * 3.2;
+    }
+  }
+  return buf;
+}
+
+function noiseStop() {
+  try {
+    if (noise.src) { noise.src.stop(); noise.src.disconnect(); }
+    if (noise.lfo) { noise.lfo.stop(); noise.lfo.disconnect(); }
+    if (noise.gain) noise.gain.disconnect();
+  } catch (e) { /* 已经停了 */ }
+  noise.src = null;
+  noise.lfo = null;
+  noise.gain = null;
+}
+
+function noiseStart(kind) {
+  noiseStop();
+  noise.kind = kind || 'off';
+  if (noise.kind === 'off') return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!noise.ctx) noise.ctx = new AC();
+    const ctx = noise.ctx;
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer(ctx, noise.kind);
+    src.loop = true;
+
+    const g = ctx.createGain();
+    const base = 0.06 + noiseVolume() * 0.5;
+    g.gain.value = base;
+
+    if (noise.kind === 'rain') {
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 1600;
+      src.connect(hp); hp.connect(g);
+    } else if (noise.kind === 'ocean') {
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 620;
+      src.connect(lp); lp.connect(g);
+      // 慢速起伏，像浪一阵一阵
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 0.09;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = base * 0.45;
+      lfo.connect(lfoGain); lfoGain.connect(g.gain);
+      lfo.start();
+      noise.lfo = lfo;
+    } else {
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 800;
+      src.connect(lp); lp.connect(g);
+    }
+
+    g.connect(ctx.destination);
+    src.start();
+    noise.src = src;
+    noise.gain = g;
+  } catch (e) {
+    console.warn('[noise] 播放失败', e);
+  }
 }
 
 /** 响铃：浏览器禁止自动播放，只有用户点过按钮后才允许（这里必然由点击触发） */
@@ -2535,6 +2893,79 @@ function saveNotes() {
   store.set(KEY_NOTES, state.notes);
 }
 
+/** 当前计划里排进去的章节；还没生成计划就退回"已勾选的章节" */
+function noteChapters() {
+  if (state.plan && Array.isArray(state.plan.sectionList) && state.plan.sectionList.length) {
+    return state.plan.sectionList.slice();
+  }
+  const list = (state.bookData && state.bookData.list) || [];
+  return list.filter(function (s) { return state.selected.has(s.n); })
+    .map(function (s) { return { n: s.n, title: s.title }; });
+}
+
+function noteGroupKey(note) {
+  return note.section && typeof note.section.n === 'number' ? ('s' + note.section.n) : '';
+}
+
+function renderNoteSections() {
+  const box = $('noteSecList');
+  if (!box) return;
+  const chapters = noteChapters();
+  const subject = (state.plan && state.plan.subject) || state.bookKey || '';
+  const done = {};
+  state.notes.forEach(function (n) {
+    if (n.section && typeof n.section.n === 'number') done[n.section.n] = (done[n.section.n] || 0) + 1;
+  });
+  const written = Object.keys(done).length;
+
+  $('noteSecInfo').textContent = !chapters.length
+    ? '还没生成计划（先回起始页勾章节 → 生成计划，这里就会出现你选的章）'
+    : ('《' + subject + '》共 ' + chapters.length + ' 章，已写卡 ' + written + ' 章' + (written < chapters.length ? '，还有 ' + (chapters.length - written) + ' 章待补' : '，全写完了'));
+
+  if (!chapters.length) {
+    box.innerHTML = '<div class="note-empty">' +
+      '先在上一个页签生成 31 天计划，这里就会按你选的章节一行一章列出来。' +
+      '</div>';
+    return;
+  }
+
+  box.innerHTML = chapters.map(function (c, i) {
+    const cnt = done[c.n] || 0;
+    return '<div class="note-sec-row' + (cnt ? '' : ' empty') + '">' +
+      '<span class="idx">' + (i + 1) + '</span>' +
+      '<span class="name" title="' + esc(c.title) + '">' + esc(c.title) + '</span>' +
+      '<span class="count">' + (cnt
+        ? '<span class="pill-green pill">' + cnt + ' 张卡</span>'
+        : '<span class="pill">待补</span>') + '</span>' +
+      '<button class="btn btn-ghost btn-sm" type="button" data-sec="' + c.n + '" data-sec-title="' + esc(c.title) + '">' +
+        (cnt ? '再写一张' : '写这张卡') + '</button>' +
+    '</div>';
+  }).join('');
+}
+
+function setNoteSection(n, title) {
+  state.noteSection = (n == null) ? null : { n: Number(n), title: title || '' };
+  renderNoteTarget();
+  if (state.noteSection) {
+    const tab = document.querySelector('#tabNotes');
+    if (tab && typeof tab.click === 'function') tab.click();
+    const el = $('noteTitle');
+    if (el) { el.focus(); }
+    try { $('noteTitle').scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { /* 老浏览器 */ }
+  }
+}
+
+function renderNoteTarget() {
+  const box = $('noteTarget');
+  if (!box) return;
+  if (state.noteSection) {
+    box.hidden = false;
+    $('noteTargetText').textContent = '正在给「' + (state.noteSection.title || ('第 ' + state.noteSection.n + ' 章')) + '」写卡';
+  } else {
+    box.hidden = true;
+  }
+}
+
 function addNote() {
   const title = $('noteTitle').value.trim();
   if (!title) {
@@ -2554,21 +2985,26 @@ function addNote() {
     vertical: $('noteVertical').value.trim(),
     date: pomoTodayStr()
   };
+  // 绑到某一章（没有关联网就留空，老卡片同样适用）
+  if (state.noteSection) {
+    note.section = { n: state.noteSection.n, title: state.noteSection.title };
+  }
   state.notes.unshift(note);
   saveNotes();
   renderNotes();
+  renderNoteSections();
   ['noteTitle', 'noteDef', 'noteDiff', 'noteEx', 'noteDeep', 'noteWide', 'noteVertical'].forEach(function (id) {
     $(id).value = '';
   });
   $('noteTitle').focus();
-  toast('已保存：' + title);
+  toast('已保存：' + title + (note.section ? '（第 ' + note.section.n + ' 章）' : ''));
 }
 
 function renderNotes() {
   const q = norm($('noteSearch').value);
   const list = state.notes.filter(function (n) {
     if (!q) return true;
-    return norm(n.title + ' ' + n.def + ' ' + n.diff + ' ' + n.ex).indexOf(q) !== -1;
+    return norm(n.title + ' ' + n.def + ' ' + n.diff + ' ' + n.ex + ' ' + (n.section ? n.section.title : '')).indexOf(q) !== -1;
   });
   $('noteCount').textContent = state.notes.length + ' 条';
   $('noteList').className = state.quiz ? 'quiz' : '';
@@ -2579,7 +3015,7 @@ function renderNotes() {
     return;
   }
 
-  $('noteList').innerHTML = list.map(function (n, i) {
+  const cardHtml = function (n, i) {
     const row = function (k, v) {
       return v ? '<div class="note-row"><span class="k">' + k + '</span><span class="v ans">' + esc(v) + '</span></div>' : '';
     };
@@ -2590,6 +3026,7 @@ function renderNotes() {
     return '<div class="note-card" data-note="' + esc(n.id) + '">' +
       '<div class="note-card-head">' +
         '<h4>#' + (i + 1) + ' ' + esc(n.title) + '</h4>' +
+        (n.section ? '<span class="pill">' + esc(n.section.title || ('第 ' + n.section.n + ' 章')) + '</span>' : '') +
         '<span class="pill">' + esc(n.date || '') + '</span>' +
         '<div class="note-actions">' +
           '<button class="btn btn-ghost btn-sm" data-reveal="' + esc(n.id) + '" type="button">看答案</button>' +
@@ -2599,7 +3036,76 @@ function renderNotes() {
       row('定义', n.def) + row('区别', n.diff) + row('例子', n.ex) +
       (hasExt ? '<div class="note-ext">' + ext('深度', n.deep) + ext('横向', n.wide) + ext('纵向', n.vertical) + '</div>' : '') +
     '</div>';
+  };
+
+  // 自测模式或搜索时不分组，保持一屏扫完；平时按章节分组
+  if (state.quiz || q) {
+    $('noteList').innerHTML = list.map(cardHtml).join('');
+    return;
+  }
+
+  // 按章节分组：先按计划里的章节顺序，再放"未关联章节"的
+  const order = noteChapters();
+  const groups = [];
+  const seen = {};
+  order.forEach(function (c) {
+    const members = list.filter(function (n) { return n.section && n.section.n === c.n; });
+    if (members.length) {
+      groups.push({ title: c.title || ('第 ' + c.n + ' 章'), items: members });
+      seen['s' + c.n] = true;
+    }
+  });
+  // 计划里没有、但卡片上写了章节的（比如换了书）也保留
+  list.forEach(function (n) {
+    if (!n.section) return;
+    const k = 's' + n.section.n;
+    if (seen[k]) return;
+    seen[k] = true;
+    const members = list.filter(function (m) { return m.section && m.section.n === n.section.n; });
+    groups.push({ title: n.section.title || ('第 ' + n.section.n + ' 章'), items: members });
+  });
+  const loose = list.filter(function (n) { return !n.section; });
+  if (loose.length) groups.push({ title: '未关联章节', items: loose });
+
+  let idx = 0;
+  $('noteList').innerHTML = groups.map(function (g) {
+    const head = '<div class="note-sec-group"><span>📖 ' + esc(g.title) + '</span>' +
+      '<span class="hint">' + g.items.length + ' 张</span></div>';
+    const body = g.items.map(function (n) { idx += 1; return cardHtml(n, idx); }).join('');
+    return head + body;
   }).join('');
+}
+
+/** 把已选章节列成待填模板导出，方便离线手写或打印 */
+function exportNoteTemplate() {
+  const chapters = noteChapters();
+  if (!chapters.length) { toast('先在计划页生成一份计划，才有章节可导'); return; }
+  const subject = (state.plan && state.plan.subject) || state.bookKey || '未命名';
+  const done = {};
+  state.notes.forEach(function (n) {
+    if (n.section && typeof n.section.n === 'number') done[n.section.n] = (done[n.section.n] || 0) + 1;
+  });
+  const lines = ['《' + subject + '》章节知识点总结模板（' + chapters.length + ' 章）', ''];
+  chapters.forEach(function (c) {
+    lines.push('第 ' + c.n + ' 章  ' + c.title + (done[c.n] ? '（已写 ' + done[c.n] + ' 张卡）' : ''));
+    lines.push('  一句定义：');
+    lines.push('  一句区别：');
+    lines.push('  一句例子：');
+    lines.push('  深度拓展：');
+    lines.push('  横向拓展：');
+    lines.push('  纵向拓展：');
+    lines.push('');
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '章节知识点模板-' + subject + '-' + pomoTodayStr() + '.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  toast('已导出 ' + chapters.length + ' 章的待填模板');
 }
 
 function toggleQuiz() {
@@ -2614,7 +3120,7 @@ function exportNotes() {
   if (!state.notes.length) { toast('还没有卡片可以导出'); return; }
   const text = state.notes.map(function (n, i) {
     return [
-      '#' + (i + 1) + ' ' + n.title + (n.date ? '（' + n.date + '）' : ''),
+      '#' + (i + 1) + ' ' + n.title + (n.section ? '（' + (n.section.title || ('第 ' + n.section.n + ' 章')) + '）' : '') + (n.date ? '（' + n.date + '）' : ''),
       '一句定义：' + (n.def || '—'),
       '一句区别：' + (n.diff || '—'),
       '一句例子：' + (n.ex || '—'),
@@ -2814,10 +3320,68 @@ function bindEvents() {
   $('btnPomoReset').addEventListener('click', pomoReset);
   $('btnPomoSkip').addEventListener('click', pomoSkip);
 
+  // 专注时长：快选 + 自定义
+  document.querySelectorAll('#pomoQuick .pomo-mode').forEach(function (b) {
+    b.addEventListener('click', function () {
+      $('pomoCustomMin').value = '';
+      pomoApplyFocusMin(Number(b.dataset.min));
+    });
+  });
+  $('btnPomoApplyMin').addEventListener('click', function () {
+    if (pomoApplyFocusMin($('pomoCustomMin').value)) $('pomoCustomMin').value = '';
+  });
+  $('pomoCustomMin').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (pomoApplyFocusMin($('pomoCustomMin').value)) $('pomoCustomMin').value = '';
+    }
+  });
+
+  // 白噪音：选择 / 音量（正在专注时立即生效）
+  $('pomoNoise').addEventListener('change', function () {
+    state.pomo.noise = this.value;
+    pomoSave();
+    if (state.pomo.running && state.pomo.mode === 'focus') noiseStart(state.pomo.noise);
+    else noiseStop();
+    toast(this.value === 'off' ? '白噪音已关' : '白噪音：' + this.options[this.selectedIndex].text);
+  });
+  $('pomoNoiseVol').addEventListener('input', function () {
+    state.pomo.noiseVol = Number(this.value);
+    $('pomoNoiseVolText').textContent = this.value + '%';
+    if (noise.gain) noise.gain.gain.value = 0.06 + noiseVolume() * 0.5;
+  });
+  $('pomoNoiseVol').addEventListener('change', function () { pomoSave(); });
+  $('pomoNotify').addEventListener('change', function () {
+    state.pomo.notify = this.checked;
+    pomoSave();
+    if (this.checked) askNotifyPermission();
+  });
+  window.addEventListener('focus', flashTitleStop);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) flashTitleStop();
+  });
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('#btnPomoStart') || e.target.closest('.pomo-actions')) hideChime();
+  });
+
   $('btnAddNote').addEventListener('click', addNote);
   $('btnQuizToggle').addEventListener('click', toggleQuiz);
   $('btnExportNotes').addEventListener('click', exportNotes);
+  $('btnExportTemplate').addEventListener('click', exportNoteTemplate);
   $('noteSearch').addEventListener('input', renderNotes);
+
+  // 章节 → 带章节去写卡
+  $('noteSecList').addEventListener('click', function (e) {
+    const b = e.target.closest('[data-sec]');
+    if (!b) return;
+    setNoteSection(Number(b.dataset.sec), b.dataset.secTitle || '');
+    toast('现在给这一章写卡：写完点保存就行');
+  });
+  $('btnClearNoteTarget').addEventListener('click', function () {
+    state.noteSection = null;
+    renderNoteTarget();
+    toast('已取消章节关联');
+  });
 
   $('noteList').addEventListener('click', function (e) {
     const revealBtn = e.target.closest('[data-reveal]');
@@ -2838,6 +3402,7 @@ function bindEvents() {
         state.notes.splice(idx, 1);
         saveNotes();
         renderNotes();
+        renderNoteSections();
         toast('已删除：' + name);
       }
     }
@@ -3635,6 +4200,8 @@ function init() {
   pomoSetMode('focus');
   loadNotes();
   renderNotes();
+  renderNoteSections();
+  renderNoteTarget();
   restorePick();
   bindEvents();
   bindArchive();
