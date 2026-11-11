@@ -323,6 +323,9 @@ a { color: var(--accent); }
 @media (max-width: 520px) { .import-row { grid-template-columns: minmax(0, 1fr); } }
 .import-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .import-label-row .btn { flex: 0 0 auto; }
+.import-fetch { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.import-fetch .input { flex: 1 1 220px; min-width: 0; }
+.import-fetch .btn { flex: 0 0 auto; }
 .modal-import .textarea { min-height: 130px; }
 .modal-head {
   flex: 0 0 auto;
@@ -1010,6 +1013,17 @@ td b { color: var(--accent); font-weight: 600; }
       </div>
       <div class="field">
         <div class="import-label-row">
+          <label class="f-label" for="importFetchUrl">抓取服务（可选，配了就自动抓目录）</label>
+          <button class="btn btn-ghost btn-sm" id="btnSaveFetch" type="button">保存地址</button>
+        </div>
+        <div class="import-fetch">
+          <input class="input" id="importFetchUrl" type="text" autocomplete="off" placeholder="http://127.0.0.1:8765 或 https://xxx.workers.dev">
+          <button class="btn btn-ghost btn-sm" id="btnFetchNow" type="button">🌐 抓取这个书名</button>
+        </div>
+        <div class="hint" id="fetchHint">没配也行：本机开着抓取助手时，会自动试 http://127.0.0.1:8765。</div>
+      </div>
+      <div class="field">
+        <div class="import-label-row">
           <label class="f-label" for="importText">把目录整段粘进来（一行一章即可）</label>
           <button class="btn btn-ghost btn-sm" id="btnPasteClip" type="button">📋 读剪贴板</button>
         </div>
@@ -1212,6 +1226,7 @@ const KEY_POMO = 'xh_pomo_v1';
 const KEY_LAST = 'xh_last_v1';       // 上次打开时正在用的那套方案
 const KEY_HISTORY = 'xh_history_v1'; // 学习档案：用过哪些书、最后一次什么配置
 const KEY_LIB = 'xh_lib_v1';         // 自己导入的目录（任意书）
+const KEY_FETCH = 'xh_fetch_v1';     // 抓取服务地址（本地助手 或 云端 Worker）
 const HISTORY_MAX = 20;              // 最多记 20 本书，够用又不至于翻不完
 
 let toastTimer = 0;
@@ -1259,11 +1274,27 @@ function searchSections(query) {
 
   if (!key) {
     const scored = fuzzyRank(q);
-    if (scored.length && scored[0].score >= 2) key = scored[0].key;
+    const top = scored[0];
+    // 光靠“字符重合”会把乱码书名硬配成某本书，再加一条：必须有 2 连字相同
+    if (top && top.score >= 2 && commonRun(norm(q), norm(top.key)) >= 2) key = top.key;
   }
 
   if (!key) return null;
   return { key: key, data: CHAPTERS[key], exact: norm(key) === q };
+}
+
+/** 最长公共子串长度：模糊匹配时用来判断“真的像”，而不是只是字面重叠 */
+function commonRun(a, b) {
+  if (!a || !b) return 0;
+  let best = 0;
+  for (let i = 0; i < a.length; i++) {
+    for (let j = 0; j < b.length; j++) {
+      let k = 0;
+      while (a[i + k] && b[j + k] && a[i + k] === b[j + k]) k++;
+      if (k > best) best = k;
+    }
+  }
+  return best;
 }
 
 /** 字符重合度排序，用于“没查到但想给个近似建议” */
@@ -1295,7 +1326,7 @@ const state = {
 /* ============================================================
    E. 章节弹框
    ============================================================ */
-function openChapterPicker() {
+async function openChapterPicker() {
   const raw = $('inputSubject').value.trim();
   if (!raw) {
     showErr('startErr', '先输入书名或科目，再点查章节。');
@@ -1306,9 +1337,13 @@ function openChapterPicker() {
 
   const hit = searchSections(raw);
   if (!hit) {
-    const top = fuzzyRank(norm(raw)).slice(0, 3).map(function (x) { return x.key; });
-    showErr('startErr', '内置书目里没有“' + raw + '”。' + (top.length ? '你是不是要找：' + top.join(' / ') + '？' : '') + '点下面两个搜索入口找到这本书，复制目录后切回来，会自动接上并弹出章节；实在找不到目录就按章数生成。');
-    showSearchLinks(raw);
+    // 内置没有 → 先让抓取服务联网抓一次；抓不到再退回复制粘贴那套
+    $('btnSearch').disabled = true;
+    try {
+      await tryAutoFetch(raw);
+    } finally {
+      $('btnSearch').disabled = false;
+    }
     return;
   }
   showSearchLinks(null);
@@ -3177,6 +3212,169 @@ function loadCustomLib() {
   return count;
 }
 
+/* ============================================================
+   联网抓目录：接本地抓取助手（http://127.0.0.1:8765）或云端 Worker
+   ------------------------------------------------------------------
+   纯前端抓不了第三方页面（没 CORS 头），所以另起一个"抓取服务"，
+   由它去取微信读书公开页面里内嵌的 chapterInfos，再把目录交回来。
+   ============================================================ */
+const DEFAULT_FETCH_LOCAL = 'http://127.0.0.1:8765';
+
+/** 可用的抓取服务地址：用户存的优先，其次本地助手的默认地址 */
+function fetchEndpoints() {
+  const out = [];
+  const saved = store.get(KEY_FETCH, null);
+  if (typeof saved === 'string' && /^https?:\/\//i.test(saved.trim())) {
+    out.push(saved.trim().replace(/\/+$/, ''));
+  }
+  const local = DEFAULT_FETCH_LOCAL;
+  if (out.indexOf(local) === -1) out.push(local);
+  return out;
+}
+
+/** 带超时的 JSON 请求（AbortController，老浏览器不支持就退化成普通 fetch） */
+function getJsonQuick(url, ms) {
+  return new Promise(function (resolve, reject) {
+    let done = false;
+    let timer = 0;
+    const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    const finish = function (fn, val) {
+      if (done) return;
+      done = true;
+      if (timer) window.clearTimeout(timer);
+      fn(val);
+    };
+    timer = window.setTimeout(function () {
+      if (ctrl) { try { ctrl.abort(); } catch (e) {} }
+      finish(reject, new Error('超时'));
+    }, ms);
+    fetch(url, ctrl ? { signal: ctrl.signal, cache: 'no-store' } : { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { finish(resolve, j); })
+      .catch(function (e) { finish(reject, e); });
+  });
+}
+
+/** 依次试所有抓取服务，返回 { ok, book, chapters } */
+async function fetchOutline(name) {
+  const eps = fetchEndpoints();
+  let reason = '';
+  for (let i = 0; i < eps.length; i++) {
+    const ep = eps[i];
+    const isLocal = /127\.0\.0\.1|localhost/i.test(ep);
+    try {
+      if (isLocal) {
+        // 本机没开助手就别干等，2.5 秒内探活失败直接跳过
+        const h = await getJsonQuick(ep + '/health', 2500);
+        if (!h || !h.ok) { reason = reason || '本地抓取助手没启动'; continue; }
+      }
+      const r = await getJsonQuick(ep + '/outline?book=' + encodeURIComponent(name), isLocal ? 15000 : 9000);
+      if (r && r.ok && r.chapters && r.chapters.length >= 2) return r;
+      reason = (r && r.reason) || '抓取服务没返回目录';
+    } catch (e) {
+      reason = isLocal ? '本地抓取助手没启动（' + ep + '）' : '抓取服务连不上';
+    }
+  }
+  return { ok: false, reason: reason || '没配置可用的抓取服务' };
+}
+
+/** 把抓到的目录装进 CHAPTERS，并直接弹出章节勾选框 */
+function adoptFetched(name, res) {
+  const list = (res.chapters || []).map(function (c, i) {
+    const t = String((c && c.title) || '').trim();
+    return { n: i + 1, title: t || ('第 ' + (i + 1) + ' 章'), desc: '' };
+  });
+  if (list.length < 2) return false;
+  const real = ((res.book || {}).title || '').trim();
+  CHAPTERS[name] = {
+    info: '《' + name + '》· 联网抓到的目录（' + list.length + ' 章）' +
+          (real && real !== name ? '，来源：微信读书《' + real + '》' : '，来源：微信读书') + '。',
+    suggest: suggestFor(list.length),
+    note: '标题来自微信读书公开目录，可能带“卷一 / 第一部分”这类层级；建议先学前 3 章建立框架。',
+    list: list,
+    custom: true
+  };
+  saveCustomLib();
+  renderBookChips();
+
+  state.bookKey = name;
+  state.bookData = CHAPTERS[name];
+  state.selected = new Set();
+  $('inputSubject').value = name;
+  $('modalBook').textContent = '《' + name + '》 · 共 ' + list.length + ' 章';
+  $('modalInfo').innerHTML =
+    '<b>简介：</b>' + esc(CHAPTERS[name].info) +
+    '<br><b>来源：</b>联网抓取' + (real && real !== name ? '（' + esc(real) + '）' : '') +
+    '<br><b>高亮行 = 建议先学的章节（' + CHAPTERS[name].suggest.length + ' 章），默认全部不勾选，你自己决定。';
+  $('modalTitle').textContent = '章节目录 · 勾选要学的部分';
+  showSearchLinks(null);
+  renderChapterList();
+  $('chapterModal').hidden = false;
+  closeImportModal();
+  $('modalBox').focus();
+  return true;
+}
+
+/** 内置没有这本书时的兜底提示 + 两个搜索外链 */
+function showMissingBook(raw, reason) {
+  const top = fuzzyRank(norm(raw)).slice(0, 3).map(function (x) { return x.key; });
+  showErr('startErr', '内置书目里没有“' + raw + '”。' +
+    (top.length ? '你是不是要找：' + top.join(' / ') + '？' : '') +
+    (reason ? '自动抓取没成功（' + reason + '）。' : '') +
+    '点下面两个搜索入口复制目录、切回来会自动接上；也可以配个抓取服务，让它直接出目录。');
+  showSearchLinks(raw);
+}
+
+/** 联网抓一次；成功直接进章节弹框，失败退回复制粘贴那套 */
+async function tryAutoFetch(raw) {
+  toast('正在联网抓目录…');
+  let res;
+  try { res = await fetchOutline(raw); } catch (e) { res = { ok: false, reason: '抓取出错' }; }
+  if (res && res.ok && adoptFetched(raw, res)) {
+    toast('抓到 ' + res.chapters.length + ' 章，来自微信读书');
+    return true;
+  }
+  showMissingBook(raw, (res && res.reason) || '没抓到目录');
+  return false;
+}
+
+function bindFetchService() {
+  const url = $('importFetchUrl');
+  const hint = $('fetchHint');
+  const saved = store.get(KEY_FETCH, null);
+  if (url && typeof saved === 'string') url.value = saved;
+  if (hint && typeof saved === 'string' && saved) hint.textContent = '当前用：' + saved;
+
+  if ($('btnSaveFetch')) {
+    $('btnSaveFetch').addEventListener('click', function () {
+      const v = ($('importFetchUrl').value || '').trim().replace(/\/+$/, '');
+      if (!v) { store.del(KEY_FETCH); if (hint) hint.textContent = '已清空：只会自动试本地助手。'; toast('已清空抓取地址'); return; }
+      if (!/^https?:\/\//i.test(v)) { toast('地址要以 http:// 或 https:// 开头'); return; }
+      store.set(KEY_FETCH, v);
+      if (hint) hint.textContent = '当前用：' + v;
+      toast('抓取地址已保存');
+    });
+  }
+
+  if ($('btnFetchNow')) {
+    $('btnFetchNow').addEventListener('click', async function () {
+      const name = (($('importName').value || '').trim() || ($('inputSubject').value || '').trim());
+      if (!name) { toast('先填书名'); $('importName').focus(); return; }
+      const btn = $('btnFetchNow');
+      btn.disabled = true;
+      toast('正在联网抓“' + name + '”…');
+      let res;
+      try { res = await fetchOutline(name); } catch (e) { res = { ok: false, reason: '抓取出错' }; }
+      btn.disabled = false;
+      if (res && res.ok && adoptFetched(name, res)) { toast('抓到 ' + res.chapters.length + ' 章'); return; }
+      // 抓不到：至少把候选书名告诉人，比干瞪眼有用
+      const c = ((res && res.candidates) || []).slice(0, 3).join(' / ');
+      toast((res.reason || '抓不到') + (c ? '；搜到的相近书：' + c : ''));
+      if (hint) hint.textContent = (res.reason || '抓不到') + (c ? ' · 相近：' + c : '');
+    });
+  }
+}
+
 function openImportModal() {
   const sub = $('importSub');
   if (sub) sub.textContent = '内置目录里没有的书：粘一次目录就好，数据只存本机浏览器';
@@ -3372,6 +3570,9 @@ function bindImport() {
   }
 
   if ($('btnPasteClip')) $('btnPasteClip').addEventListener('click', readClipboardInto);
+
+  // 抓取服务地址：保存 / 立刻抓当前书名
+  bindFetchService();
 
   // 点“去微信读书/豆瓣搜”时把书名记下、导入弹框先备好；回来直接粘贴
   ['linkWeread', 'linkDouban'].forEach(function (id) {
