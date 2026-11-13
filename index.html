@@ -779,6 +779,17 @@ td b { color: var(--accent); font-weight: 600; }
 .note-empty { text-align: center; color: var(--ink-3); font-size: 13.5px; padding: 32px 0; }
 .note-actions { margin-left: auto; display: flex; gap: 6px; }
 
+/* 背诵稿 */
+.note-recite { padding: 20px 22px; margin-bottom: 16px; }
+.recite-group { margin-top: 14px; }
+.recite-group-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; font-size: 13px; color: var(--ink-2); }
+.recite-group-head .hint { margin-left: auto; }
+.recite-card { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 13px 15px; margin-bottom: 10px; }
+.recite-card-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.recite-card-head h4 { font-size: 14.5px; flex: 1 1 auto; }
+.recite-mask .ans { filter: blur(4.5px); user-select: none; transition: filter .2s ease; }
+.recite-mask .recite-card.revealed .ans { filter: none; user-select: auto; }
+
 /* ============================================================
    10. 底部
    ============================================================ */
@@ -1047,6 +1058,7 @@ td b { color: var(--accent); font-weight: 600; }
         <h3>所选章节知识点总结</h3>
         <span class="hint" id="noteSecInfo">还没生成计划</span>
         <div class="note-actions">
+          <button class="btn btn-ghost btn-sm" id="btnRecite" type="button" aria-expanded="false">背诵稿</button>
           <button class="btn btn-ghost btn-sm" id="btnExportTemplate" type="button">导出待填模板</button>
         </div>
       </div>
@@ -1054,6 +1066,22 @@ td b { color: var(--accent); font-weight: 600; }
         每学完一章就给它写一张卡：点章节名 → 卡片自动绑到这一章；下面的卡片会按章分组。没有卡片的章节会标灰，提醒你补。
       </p>
       <div id="noteSecList"></div>
+    </div>
+
+    <div class="card note-recite" id="recitePanel" hidden>
+      <div class="note-sec-head">
+        <h3>背诵稿 · 按章节汇总</h3>
+        <span class="hint" id="reciteInfo">—</span>
+        <div class="note-actions">
+          <button class="btn btn-ghost btn-sm" id="btnReciteToggleAnswers" type="button">显示答案</button>
+          <button class="btn btn-ghost btn-sm" id="btnReciteCopyAll" type="button">复制全文</button>
+          <button class="btn btn-ghost btn-sm" id="btnReciteExport" type="button">导出 txt</button>
+        </div>
+      </div>
+      <p class="hint" style="margin-top:6px;">
+        把你写过的卡片按章节排成一份复习稿：先遮答案自己背，点「看答案」掀开；也可以复制全文或导出 txt 带走。这里汇总的是你自己写的卡片，不是自动概括书本正文。
+      </p>
+      <div id="reciteBody"></div>
     </div>
 
     <div class="card note-form">
@@ -1477,7 +1505,9 @@ const state = {
   notes: [],
   quiz: false,
   pomo: { mode: 'focus', left: 1500, timer: 0, running: false, cycle: 0, focusSec: 1500, noise: 'off', noiseVol: 35, notify: true },
-  noteSection: null      // 当前写卡绑定的章节 { n, title }
+  noteSection: null,     // 当前写卡绑定的章节 { n, title }
+  reciteOpen: false,    // 背诵稿面板是否展开
+  reciteMask: true      // 背诵稿是否先遮住答案
 };
 
 /* ============================================================
@@ -1647,6 +1677,7 @@ function generatePlan(fromModal) {
   showPlanView();
   switchTab('plan');
   renderNoteSections();   // 计划变了，「所选章节知识点总结」跟着变
+  renderRecite();         // 背诵稿章节分组同步刷新
 
   console.log('[学习闭环] buildPlan 结果：', plan);
   if (plan.overflow > 0) {
@@ -2517,6 +2548,7 @@ function switchTab(name) {
   if (name === 'notes') {
     renderNoteSections();
     renderNoteTarget();
+    renderRecite();
   }
 }
 
@@ -3006,6 +3038,7 @@ function addNote() {
   saveNotes();
   renderNotes();
   renderNoteSections();
+  renderRecite();
   ['noteTitle', 'noteDef', 'noteDiff', 'noteEx', 'noteDeep', 'noteWide', 'noteVertical'].forEach(function (id) {
     $(id).value = '';
   });
@@ -3119,6 +3152,148 @@ function exportNoteTemplate() {
   document.body.removeChild(a);
   window.setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
   toast('已导出 ' + chapters.length + ' 章的待填模板');
+}
+
+/* ============================================================
+   背诵稿：按章节汇总已有卡片，可遮答案背诵、复制、导出
+   ============================================================ */
+/** 复用卡片分组顺序：计划章节 → 计划外但带章节的 → 未关联章节 */
+function reciteGroups() {
+  const order = noteChapters();
+  const groups = [];
+  const seen = {};
+  order.forEach(function (c) {
+    const members = state.notes.filter(function (n) { return n.section && n.section.n === c.n; });
+    if (members.length) {
+      groups.push({ title: c.title || ('第 ' + c.n + ' 章'), items: members });
+      seen['s' + c.n] = true;
+    }
+  });
+  state.notes.forEach(function (n) {
+    if (!n.section) return;
+    const k = 's' + n.section.n;
+    if (seen[k]) return;
+    seen[k] = true;
+    const members = state.notes.filter(function (m) { return m.section && m.section.n === n.section.n; });
+    groups.push({ title: n.section.title || ('第 ' + n.section.n + ' 章'), items: members });
+  });
+  const loose = state.notes.filter(function (n) { return !n.section; });
+  if (loose.length) groups.push({ title: '未关联章节', items: loose });
+  return groups;
+}
+
+function noteCardText(n) {
+  const lines = [n.title];
+  if (n.def) lines.push('  定义：' + n.def);
+  if (n.diff) lines.push('  区别：' + n.diff);
+  if (n.ex) lines.push('  例子：' + n.ex);
+  if (n.deep) lines.push('  深度：' + n.deep);
+  if (n.wide) lines.push('  横向：' + n.wide);
+  if (n.vertical) lines.push('  纵向：' + n.vertical);
+  return lines.join('\n');
+}
+
+function groupText(g) {
+  return '【' + g.title + '】（' + g.items.length + ' 张）\n' + g.items.map(noteCardText).join('\n\n');
+}
+
+function buildReciteText() {
+  const groups = reciteGroups();
+  const subject = (state.plan && state.plan.subject) || state.bookKey || '未命名';
+  const lines = ['《' + subject + '》背诵稿（' + state.notes.length + ' 张卡）', ''];
+  groups.forEach(function (g) {
+    lines.push(groupText(g));
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+
+function copyText(text, okMsg) {
+  function fallback() {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { /* 老浏览器 */ }
+    document.body.removeChild(ta);
+    toast(ok ? okMsg : '复制失败，请手动选中复制');
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { toast(okMsg); }).catch(fallback);
+  } else {
+    fallback();
+  }
+}
+
+function renderRecite() {
+  const panel = $('recitePanel');
+  if (!panel) return;
+  const groups = reciteGroups();
+  const total = state.notes.length;
+  $('reciteInfo').textContent = total ? (groups.length + ' 组 · ' + total + ' 张卡') : '还没有卡片';
+  panel.classList.toggle('recite-mask', !!state.reciteMask);
+  $('btnReciteToggleAnswers').textContent = state.reciteMask ? '显示答案' : '遮住答案';
+
+  if (!total) {
+    $('reciteBody').innerHTML = '<div class="note-empty">还没有卡片。先在上面写几张，背诵稿会自动按章汇总。</div>';
+    return;
+  }
+
+  let idx = 0;
+  $('reciteBody').innerHTML = groups.map(function (g, gi) {
+    const head = '<div class="recite-group">' +
+      '<div class="recite-group-head"><span>📖 ' + esc(g.title) + '</span>' +
+      '<span class="hint">' + g.items.length + ' 张</span>' +
+      '<button class="btn btn-ghost btn-sm" data-copy-group="' + gi + '" type="button">复制本章</button></div>';
+    const body = g.items.map(function (n) {
+      idx += 1;
+      const row = function (k, v) {
+        return v ? '<div class="note-row"><span class="k">' + k + '</span><span class="v ans">' + esc(v) + '</span></div>' : '';
+      };
+      const ext = function (k, v) {
+        return v ? '<div><span>' + k + '</span>' + esc(v) + '</div>' : '';
+      };
+      const hasExt = n.deep || n.wide || n.vertical;
+      return '<div class="recite-card" data-note="' + esc(n.id) + '">' +
+        '<div class="recite-card-head"><h4>#' + idx + ' ' + esc(n.title) + '</h4>' +
+        '<span class="pill">' + esc(n.date || '') + '</span>' +
+        '<div class="note-actions"><button class="btn btn-ghost btn-sm" data-reveal="' + esc(n.id) + '" type="button">看答案</button></div></div>' +
+        row('定义', n.def) + row('区别', n.diff) + row('例子', n.ex) +
+        (hasExt ? '<div class="note-ext">' + ext('深度', n.deep) + ext('横向', n.wide) + ext('纵向', n.vertical) + '</div>' : '') +
+      '</div>';
+    }).join('');
+    return head + body + '</div>';
+  }).join('');
+}
+
+function exportRecite() {
+  if (!state.notes.length) { toast('还没有卡片可以导出'); return; }
+  const subject = (state.plan && state.plan.subject) || state.bookKey || '未命名';
+  const blob = new Blob([buildReciteText()], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '背诵稿-' + subject + '-' + pomoTodayStr() + '.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  toast('已导出背诵稿 ' + state.notes.length + ' 张卡');
+}
+
+function toggleRecitePanel() {
+  state.reciteOpen = !state.reciteOpen;
+  $('recitePanel').hidden = !state.reciteOpen;
+  $('btnRecite').setAttribute('aria-expanded', state.reciteOpen ? 'true' : 'false');
+  if (state.reciteOpen) renderRecite();
+}
+
+function toggleReciteMask() {
+  state.reciteMask = !state.reciteMask;
+  renderRecite();
 }
 
 function toggleQuiz() {
@@ -3381,6 +3556,29 @@ function bindEvents() {
   $('btnQuizToggle').addEventListener('click', toggleQuiz);
   $('btnExportNotes').addEventListener('click', exportNotes);
   $('btnExportTemplate').addEventListener('click', exportNoteTemplate);
+  $('btnRecite').addEventListener('click', toggleRecitePanel);
+  $('btnReciteToggleAnswers').addEventListener('click', toggleReciteMask);
+  $('btnReciteCopyAll').addEventListener('click', function () {
+    if (!state.notes.length) { toast('还没有卡片可以复制'); return; }
+    copyText(buildReciteText(), '已复制整本背诵稿');
+  });
+  $('btnReciteExport').addEventListener('click', exportRecite);
+  $('reciteBody').addEventListener('click', function (e) {
+    const rv = e.target.closest('[data-reveal]');
+    if (rv) {
+      const card = rv.closest('.recite-card');
+      if (card) {
+        const on = card.classList.toggle('revealed');
+        rv.textContent = on ? '收起答案' : '看答案';
+      }
+      return;
+    }
+    const cg = e.target.closest('[data-copy-group]');
+    if (cg) {
+      const g = reciteGroups()[Number(cg.dataset.copyGroup)];
+      if (g) copyText(groupText(g), '已复制「' + g.title + '」');
+    }
+  });
   $('noteSearch').addEventListener('input', renderNotes);
 
   // 章节 → 带章节去写卡
@@ -3416,6 +3614,7 @@ function bindEvents() {
         saveNotes();
         renderNotes();
         renderNoteSections();
+        renderRecite();
         toast('已删除：' + name);
       }
     }
@@ -4215,6 +4414,7 @@ function init() {
   renderNotes();
   renderNoteSections();
   renderNoteTarget();
+  renderRecite();
   restorePick();
   bindEvents();
   bindArchive();
